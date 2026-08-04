@@ -16,15 +16,12 @@ library(plotly)
 
 library(nycOpenData)
 
-# Load available NYC Open Data datasets
-blah <- nyc_list_datasets()
+source("R/data.R")
+source("R/plots.R")
+source("R/helpers.R")
 
-# Load NYC 311 service request data
-trying <- nyc_pull_dataset(
-  dataset = "erm2-nwe9",
-  date_field = "created_date"
-)
-
+trying <- get_311_data()
+trying <- clean_311_data(trying)
 
 # -------------------------
 # User Interface
@@ -44,10 +41,7 @@ ui <- fluidPage(
       selectInput(
         "borough",
         "Select Borough",
-        choices = c(
-          "All",
-          sort(unique(na.omit(trying$borough)))
-        ),
+        choices = get_borough_choices(trying),
         selected = "All"
       )
     ),
@@ -57,8 +51,15 @@ ui <- fluidPage(
       
       h3("Top 10 Agencies Receiving 311 Requests"),
       
-      # Interactive Plotly chart
+      # Interactive agency chart
       plotlyOutput("distPlot"),
+      
+      br(),
+      
+      h3("Top 10 Complaint Types"),
+      
+      # Interactive complaint-type chart
+      plotlyOutput("complaintPlot"),
       
       br(),
       
@@ -104,47 +105,28 @@ server <- function(input, output) {
   })
   
   
-  # Render an interactive bar chart of the top ten agencies.
   output$distPlot <- renderPlotly({
     
-    plot_data <- agency_summary() %>%
-      slice_max(
-        order_by = n,
-        n = 10,
-        with_ties = FALSE
-      )
-    
-    agency_plot <- plot_data %>%
-      ggplot(
-        aes(
-          x = reorder(agency_name, n),
-          y = n,
-          text = paste0(
-            "Agency: ",
-            agency_name,
-            "<br>Requests: ",
-            scales::comma(n)
-          )
-        )
-      ) +
-      geom_col() +
-      coord_flip() +
-      labs(
-        title = "Counts by Agency",
-        x = "Agency",
-        y = "Number of Requests"
-      ) +
-      theme_minimal() +
-      theme(
-        legend.position = "none"
-      )
+    plot <- create_agency_plot(filtered_data())
     
     ggplotly(
-      agency_plot,
+      plot,
       tooltip = "text"
     )
+    
   })
   
+  # Render an interactive bar chart of the top complaint types
+  output$complaintPlot <- renderPlotly({
+    
+    plot <- create_complaint_plot(filtered_data())
+    
+    ggplotly(
+      plot,
+      tooltip = "text"
+    )
+    
+  })
   
   # Render an interactive summary table of agency request counts.
   output$agencyTable <- renderDT({
