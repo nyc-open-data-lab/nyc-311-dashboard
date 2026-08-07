@@ -6,64 +6,146 @@
 #
 #    https://shiny.posit.co/
 #
-
+# Packages ####
 library(shiny)
 library(shinydashboard)
 library(shinythemes)
 library(tidyverse)
 library(DT)
 library(plotly)
-
 library(nycOpenData)
+source("R/data.R")
+source("R/plots.R")
+source("R/helpers.R")
 
+# Loading the data ####
 
-blah <- nyc_list_datasets()
+data_nyc <- get_311_data()
+data_nyc <- clean_311_data(data_nyc)
 
-trying <- nyc_pull_dataset(dataset = "erm2-nwe9", date_field = "created_date")
+# User Interface ####
 
-plot_trying <- ggplot(trying, aes(x = agency_name)) +
-  geom_bar()
-
-# Define UI for application that draws a histogram
 ui <- fluidPage(
-
-    # Application title
-    titlePanel("NYC 311 Data"),
-
-    # Sidebar with a slider input for number of bins 
-    sidebarLayout(
-        sidebarPanel(
-            selectInput("borough", "Select Borough",
-                        choices = c(All = "All", trying$borough),
-                        selected = "All")
-        ),
-
-        # Show a plot of the generated distribution
-        mainPanel(
-           plotOutput("distPlot")
-        )
+  
+  # Application title
+  titlePanel("NYC 311 Data"),
+  
+  sidebarLayout(
+    
+    # Sidebar controls
+    sidebarPanel(
+      
+      # Borough selector
+      selectInput(
+        "borough",
+        "Select Borough",
+        choices = get_borough_choices(data_nyc),
+        selected = "All"
+      )
+    ),
+    
+    # Main dashboard content
+    mainPanel(
+      
+      h3("Top 10 Agencies Receiving 311 Requests"),
+      
+      # Interactive agency chart
+      plotlyOutput("distPlot"),
+      
+      br(),
+      
+      h3("Top 10 Complaint Types"),
+      
+      # Interactive complaint-type chart
+      plotlyOutput("complaintPlot"),
+      
+      br(),
+      
+      h3("Agency Summary Table"),
+      
+      # Interactive data table
+      DTOutput("agencyTable")
     )
+  )
 )
 
-# Define server logic required to draw a histogram
+
+# Server Logic ####
+
 server <- function(input, output) {
-  output$distPlot <- renderPlot({
-    dat <- trying
+  
+  # Filter the dataset based on the selected borough.
+  # Selecting "All" displays the complete dataset.
+  filtered_data <- reactive({
+    
+    dat <- data_nyc
     
     if (!is.null(input$borough) && input$borough != "All") {
-      dat <- dat %>% filter(borough == input$borough)
+      dat <- dat %>%
+        filter(borough == input$borough)
     }
     
-    dat %>%
-      count(agency_name, name = "n") %>%
-      slice_max(n, n = 10) %>%
-      ggplot(aes(x = reorder(agency_name, n), y = n, fill = agency_name)) +
-      geom_col() +
-      coord_flip() +
-      labs(title = "Counts By Agency", x = "Agency", y = "") +
-      theme(legend.position = "none")
+    dat
   })
+  
+  
+  # Summarize the number of requests submitted to each agency.
+  agency_summary <- reactive({
+    
+    filtered_data() %>%
+      count(
+        agency_name,
+        name = "n"
+      ) %>%
+      arrange(desc(n))
+  })
+  
+  output$distPlot <- renderPlotly({
+    
+    plot <- create_agency_plot(filtered_data())
+    
+    ggplotly(
+      plot,
+      tooltip = "text"
+    )
+    
+  })
+  
+  # Render an interactive bar chart of the top complaint types
+  output$complaintPlot <- renderPlotly({
+    
+    plot <- create_complaint_plot(filtered_data())
+    
+    ggplotly(
+      plot,
+      tooltip = "text"
+    )
+    
+  })
+  
+  # Render an interactive summary table of agency request counts.
+  output$agencyTable <- renderDT({
+    
+    agency_summary() %>%
+      rename(
+        Agency = agency_name,
+        `Number of Requests` = n
+      )
+    
+  },
+  options = list(
+    pageLength = 10,
+    order = list(
+      list(1, "desc")
+    )
+  ),
+  rownames = FALSE
+  )
 }
 
-# Run the application 
-shinyApp(ui = ui, server = server)
+
+# Run the application
+shinyApp(
+  ui = ui,
+  server = server
+)
