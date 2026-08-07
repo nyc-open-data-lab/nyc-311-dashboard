@@ -6,26 +6,24 @@
 #
 #    https://shiny.posit.co/
 #
-
+# Packages ####
 library(shiny)
 library(shinydashboard)
 library(shinythemes)
 library(tidyverse)
 library(DT)
 library(plotly)
-
 library(nycOpenData)
-
 source("R/data.R")
 source("R/plots.R")
 source("R/helpers.R")
 
-trying <- get_311_data()
-trying <- clean_311_data(trying)
+# Loading the data ####
 
-# -------------------------
-# User Interface
-# -------------------------
+data_nyc <- get_311_data()
+data_nyc <- clean_311_data(data_nyc)
+
+# User Interface ####
 
 ui <- fluidPage(
   
@@ -41,7 +39,7 @@ ui <- fluidPage(
       selectInput(
         "borough",
         "Select Borough",
-        choices = get_borough_choices(trying),
+        choices = get_borough_choices(data_nyc),
         selected = "All"
       )
     ),
@@ -72,9 +70,7 @@ ui <- fluidPage(
 )
 
 
-# -------------------------
-# Server Logic
-# -------------------------
+# Server Logic ####
 
 server <- function(input, output) {
   
@@ -82,7 +78,7 @@ server <- function(input, output) {
   # Selecting "All" displays the complete dataset.
   filtered_data <- reactive({
     
-    dat <- trying
+    dat <- data_nyc
     
     if (!is.null(input$borough) && input$borough != "All") {
       dat <- dat %>%
@@ -103,7 +99,6 @@ server <- function(input, output) {
       ) %>%
       arrange(desc(n))
   })
-  
   
   output$distPlot <- renderPlotly({
     
