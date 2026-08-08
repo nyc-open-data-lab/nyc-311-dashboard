@@ -7,7 +7,10 @@ get_311_data <- function() {
   
   nyc_pull_dataset(
     dataset = "erm2-nwe9",
-    date_field = "created_date"
+    date_field = "created_date",
+    from = Sys.Date() - 30,
+    to = Sys.Date(),
+    limit = 50000
   )
   
 }
