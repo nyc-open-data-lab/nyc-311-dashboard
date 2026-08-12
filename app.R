@@ -6,14 +6,13 @@
 #
 # https://shiny.posit.co/
 #
-
+# Packages ####
 library(shiny)
 library(shinydashboard)
 library(shinythemes)
 library(tidyverse)
 library(DT)
 library(plotly)
-
 library(nycOpenData)
 
 
@@ -55,7 +54,7 @@ ui <- fluidPage(
       selectInput(
         "borough",
         "Select Borough",
-        choices = get_borough_choices(trying),
+        choices = get_borough_choices(data_nyc),
         selected = "All"
       ),
       
@@ -148,9 +147,7 @@ ui <- fluidPage(
 )
 
 
-# -------------------------
-# Server Logic
-# -------------------------
+# Server Logic ####
 
 server <- function(input, output) {
   
