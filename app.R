@@ -1,10 +1,5 @@
 #
-# This is a Shiny web application. You can run the application by clicking
-# the 'Run App' button above.
-#
-# Find out more about building applications with Shiny here:
-#
-# https://shiny.posit.co/
+# NYC 311 Shiny Dashboard
 #
 
 library(shiny)
@@ -30,6 +25,10 @@ source("R/helpers.R")
 # Load and Clean Data
 # -------------------------
 
+# TEMPORARILY COMMENTED OUT FOR WEEK 4 DEVELOPMENT
+# NYC Open Data is currently returning a 503 error.
+# Existing 50,000-row "trying" object is being used instead.
+
 trying <- get_311_data()
 trying <- clean_311_data(trying)
 
@@ -38,111 +37,186 @@ trying <- clean_311_data(trying)
 # User Interface
 # -------------------------
 
-ui <- fluidPage(
+ui <- dashboardPage(
   
-  # Application title
-  titlePanel("NYC 311 Data"),
+  dashboardHeader(
+    title = "NYC 311 Dashboard"
+  ),
   
-  sidebarLayout(
+  dashboardSidebar(
     
-    # -------------------------
-    # Sidebar Controls
-    # -------------------------
-    
-    sidebarPanel(
-      
-      # Borough selector
-      selectInput(
-        "borough",
-        "Select Borough",
-        choices = get_borough_choices(trying),
-        selected = "All"
-      ),
-      
-      # Complaint type selector
-      selectInput(
-        "complaint_type",
-        "Select Complaint Type",
-        choices = get_complaint_choices(trying),
-        selected = "All"
-      ),
-      
-      # Agency selector
-      selectInput(
-        "agency",
-        "Select Agency",
-        choices = get_agency_choices(trying),
-        selected = "All"
-      ),
-      
-      # Date range selector
-      dateRangeInput(
-        "date_range",
-        "Select Date Range",
-        start = min(as.Date(trying$created_date), na.rm = TRUE),
-        end = max(as.Date(trying$created_date), na.rm = TRUE),
-        min = min(as.Date(trying$created_date), na.rm = TRUE),
-        max = max(as.Date(trying$created_date), na.rm = TRUE)
+    sidebarMenu(
+      menuItem(
+        "Dashboard",
+        tabName = "dashboard",
+        icon = icon("chart-bar")
       )
     ),
     
+    # Borough selector
+    selectInput(
+      "borough",
+      "Select Borough",
+      choices = get_borough_choices(trying),
+      selected = "All"
+    ),
     
-    # -------------------------
-    # Main Dashboard Content
-    # -------------------------
+    # ZIP code selector
+    selectizeInput(
+      "zip_code",
+      "Select ZIP Code",
+      choices = get_zip_choices(trying),
+      selected = "All",
+      options = list(
+        placeholder = "Search ZIP code"
+      )
+    ),
     
-    mainPanel(
+    # Complaint type selector
+    selectInput(
+      "complaint_type",
+      "Select Complaint Type",
+      choices = get_complaint_choices(trying),
+      selected = "All"
+    ),
+    
+    # Agency selector
+    selectInput(
+      "agency",
+      "Select Agency",
+      choices = get_agency_choices(trying),
+      selected = "All"
+    ),
+    
+    # Date range selector
+    dateRangeInput(
+      "date_range",
+      "Select Date Range",
+      start = min(as.Date(trying$created_date), na.rm = TRUE),
+      end = max(as.Date(trying$created_date), na.rm = TRUE),
+      min = min(as.Date(trying$created_date), na.rm = TRUE),
+      max = max(as.Date(trying$created_date), na.rm = TRUE)
+    )
+  ),
+  
+  dashboardBody(
+    
+    # Custom dashboard styling
+    tags$head(
+      tags$link(
+        rel = "stylesheet",
+        type = "text/css",
+        href = "custom.css"
+      )
+    ),
+    
+    tabItems(
       
-      # Complaint count
-      h3("Complaint Count"),
-      
-      textOutput("complaintCount"),
-      
-      br(),
-      
-      
-      # Time series
-      h3("311 Requests Over Time"),
-      
-      plotlyOutput("timeSeriesPlot"),
-      
-      br(),
-      
-      # Borough comparison
-      h3("Borough Comparison"),
-      
-      plotlyOutput("boroughPlot"),
-      
-      br(),
-      
-      # Agency visualization
-      h3("Top 10 Agencies Receiving 311 Requests"),
-      
-      plotlyOutput("distPlot"),
-      
-      br(),
-      
-      
-      # Complaint type visualization
-      h3("Top 10 Complaint Types"),
-      
-      plotlyOutput("complaintPlot"),
-      
-      br(),
-      
-      
-      # Top complaints table
-      h3("Top Complaints Table"),
-      
-      DTOutput("complaintTable"),
-      
-      br(),
-      
-      
-      # Agency summary table
-      h3("Agency Summary Table"),
-      
-      DTOutput("agencyTable")
+      tabItem(
+        tabName = "dashboard",
+        
+        # -------------------------
+        # Value Boxes
+        # -------------------------
+        
+        fluidRow(
+          
+          valueBoxOutput(
+            "totalRequestsBox",
+            width = 4
+          ),
+          
+          valueBoxOutput(
+            "topComplaintBox",
+            width = 4
+          ),
+          
+          valueBoxOutput(
+            "topAgencyBox",
+            width = 4
+          )
+        ),
+        
+        
+        # -------------------------
+        # Time Series
+        # -------------------------
+        
+        fluidRow(
+          
+          box(
+            title = "311 Requests Over Time",
+            width = 12,
+            status = "primary",
+            solidHeader = TRUE,
+            plotlyOutput("timeSeriesPlot")
+          )
+        ),
+        
+        
+        # -------------------------
+        # Borough + Agency Charts
+        # -------------------------
+        
+        fluidRow(
+          
+          box(
+            title = "Borough Comparison",
+            width = 6,
+            status = "primary",
+            solidHeader = TRUE,
+            plotlyOutput("boroughPlot")
+          ),
+          
+          box(
+            title = "Top 10 Agencies",
+            width = 6,
+            status = "primary",
+            solidHeader = TRUE,
+            plotlyOutput("distPlot")
+          )
+        ),
+        
+        
+        # -------------------------
+        # Complaint Type Chart
+        # -------------------------
+        
+        fluidRow(
+          
+          box(
+            title = "Top 10 Complaint Types",
+            width = 12,
+            status = "primary",
+            solidHeader = TRUE,
+            plotlyOutput("complaintPlot")
+          )
+        ),
+        
+        
+        # -------------------------
+        # Tables
+        # -------------------------
+        
+        fluidRow(
+          
+          box(
+            title = "Top Complaints Table",
+            width = 6,
+            status = "primary",
+            solidHeader = TRUE,
+            DTOutput("complaintTable")
+          ),
+          
+          box(
+            title = "Agency Summary Table",
+            width = 6,
+            status = "primary",
+            solidHeader = TRUE,
+            DTOutput("agencyTable")
+          )
+        )
+      )
     )
   )
 )
@@ -159,10 +233,8 @@ server <- function(input, output) {
   # Filter Data
   # -------------------------
   
-  # Filter the dataset based on user selections
   filtered_data <- reactive({
     
-    # Create a working copy of the original data
     dat <- trying
     
     
@@ -174,6 +246,13 @@ server <- function(input, output) {
         filter(borough == input$borough)
     }
     
+    # Filter by ZIP code
+    if (!is.null(input$zip_code) &&
+        input$zip_code != "All") {
+      
+      dat <- dat %>%
+        filter(incident_zip == input$zip_code)
+    }
     
     # Filter by complaint type
     if (!is.null(input$complaint_type) &&
@@ -204,22 +283,7 @@ server <- function(input, output) {
     }
     
     
-    # Return the filtered dataset
     dat
-  })
-  
-  
-  # -------------------------
-  # Complaint Count
-  # -------------------------
-  
-  # Display the number of complaints matching the selected filters
-  output$complaintCount <- renderText({
-    
-    paste(
-      scales::comma(nrow(filtered_data())),
-      "311 Requests"
-    )
   })
   
   
@@ -227,7 +291,6 @@ server <- function(input, output) {
   # Agency Summary
   # -------------------------
   
-  # Summarize the number of requests submitted to each agency
   agency_summary <- reactive({
     
     filtered_data() %>%
@@ -244,7 +307,6 @@ server <- function(input, output) {
   # Complaint Summary
   # -------------------------
   
-  # Summarize the number of requests for each complaint type
   complaint_summary <- reactive({
     
     filtered_data() %>%
@@ -258,10 +320,60 @@ server <- function(input, output) {
   
   
   # -------------------------
+  # Value Boxes
+  # -------------------------
+  
+  output$totalRequestsBox <- renderValueBox({
+    
+    valueBox(
+      value = scales::comma(nrow(filtered_data())),
+      subtitle = "Total Requests",
+      icon = icon("list"),
+      color = "blue"
+    )
+  })
+  
+  
+  output$topComplaintBox <- renderValueBox({
+    
+    top_complaint <- complaint_summary() %>%
+      slice_head(n = 1)
+    
+    valueBox(
+      value = ifelse(
+        nrow(top_complaint) == 0,
+        "No Data",
+        top_complaint$complaint_type
+      ),
+      subtitle = "Top Complaint",
+      icon = icon("exclamation-circle"),
+      color = "yellow"
+    )
+  })
+  
+  
+  output$topAgencyBox <- renderValueBox({
+    
+    top_agency <- agency_summary() %>%
+      slice_head(n = 1)
+    
+    valueBox(
+      value = ifelse(
+        nrow(top_agency) == 0,
+        "No Data",
+        top_agency$agency_name
+      ),
+      subtitle = "Top Agency",
+      icon = icon("building"),
+      color = "green"
+    )
+  })
+  
+  
+  # -------------------------
   # Time Series Plot
   # -------------------------
   
-  # Render an interactive time-series chart
   output$timeSeriesPlot <- renderPlotly({
     
     plot <- create_time_series_plot(filtered_data())
@@ -272,11 +384,11 @@ server <- function(input, output) {
     )
   })
   
+  
   # -------------------------
   # Borough Comparison Plot
   # -------------------------
   
-  # Render an interactive bar chart comparing boroughs
   output$boroughPlot <- renderPlotly({
     
     plot <- create_borough_plot(filtered_data())
@@ -287,11 +399,11 @@ server <- function(input, output) {
     )
   })
   
+  
   # -------------------------
   # Agency Plot
   # -------------------------
   
-  # Render an interactive bar chart of the top agencies
   output$distPlot <- renderPlotly({
     
     plot <- create_agency_plot(filtered_data())
@@ -307,7 +419,6 @@ server <- function(input, output) {
   # Complaint Type Plot
   # -------------------------
   
-  # Render an interactive bar chart of the top complaint types
   output$complaintPlot <- renderPlotly({
     
     plot <- create_complaint_plot(filtered_data())
@@ -323,7 +434,6 @@ server <- function(input, output) {
   # Top Complaints Table
   # -------------------------
   
-  # Render an interactive table of the top complaint types
   output$complaintTable <- renderDT({
     
     complaint_summary() %>%
@@ -348,7 +458,6 @@ server <- function(input, output) {
   # Agency Summary Table
   # -------------------------
   
-  # Render an interactive table of agency request counts
   output$agencyTable <- renderDT({
     
     agency_summary() %>%

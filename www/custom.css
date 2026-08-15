@@ -1,0 +1,103 @@
+/* ----------------------------------------
+   NYC 311 Dashboard Custom Styling
+   ---------------------------------------- */
+
+
+/* Main dashboard background */
+
+.content-wrapper,
+.right-side {
+  background-color: #f4f6f9;
+}
+
+
+/* Dashboard header */
+
+.main-header .logo {
+  font-weight: 600;
+  font-size: 19px;
+}
+
+
+/* Sidebar filter spacing */
+
+.sidebar .form-group {
+  padding-left: 15px;
+  padding-right: 15px;
+  margin-bottom: 18px;
+}
+
+
+/* Sidebar labels */
+
+.sidebar label {
+  font-weight: 500;
+}
+
+
+/* Dashboard boxes */
+
+.box {
+  border-radius: 6px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+
+/* Box headers */
+
+.box-header {
+  padding: 12px 15px;
+}
+
+.box-title {
+  font-weight: 600;
+}
+
+
+/* Value boxes */
+
+.small-box {
+  border-radius: 6px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+
+/* Improve spacing around dashboard content */
+
+.content {
+  padding: 20px;
+}
+
+
+/* Data tables */
+
+.dataTables_wrapper {
+  padding: 5px;
+}
+
+
+/* Make Plotly outputs fit neatly inside boxes */
+
+.plotly {
+  width: 100% !important;
+}
+
+/* ----------------------------------------
+   Value Box Text
+   ---------------------------------------- */
+
+/* Allow long value-box text to fit cleanly */
+
+.small-box h3 {
+  font-size: 28px;
+  white-space: normal;
+  overflow-wrap: break-word;
+  line-height: 1.1;
+  margin-right: 60px;
+}
+
+/* Keep value-box labels easy to read */
+
+.small-box p {
+  font-size: 16px;
+}

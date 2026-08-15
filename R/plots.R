@@ -88,6 +88,7 @@ create_time_series_plot <- function(data) {
     aes(
       x = request_date,
       y = n,
+      group = 1,
       text = paste0(
         "Date: ", request_date,
         "<br>Requests: ", scales::comma(n)
