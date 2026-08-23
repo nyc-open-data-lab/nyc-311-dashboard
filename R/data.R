@@ -2,13 +2,23 @@
 # Data Functions
 # ----------------------------------------
 
-# Retrieve NYC 311 service request data
+# Retrieve recent NYC 311 service request data.
+#
+# The function first checks for a recent local cache.
+# If a valid cache is available, it is used to reduce
+# startup time and unnecessary API requests.
+#
+# If the cache is unavailable or outdated, the function
+# attempts to retrieve fresh data from NYC Open Data.
+#
+# If the live request fails but an older cache exists,
+# the cached data are used as a fallback.
 get_311_data <- function(
     cache_file = "data/311_cache.rds",
     cache_hours = 24
 ) {
   
-  # Check whether a recent cached dataset already exists
+  # Determine whether a recent cached dataset exists
   cache_is_recent <- FALSE
   
   if (file.exists(cache_file)) {
@@ -23,7 +33,7 @@ get_311_data <- function(
   }
   
   
-  # Use the cached data if it is less than 24 hours old
+  # Use the cache when it is still recent
   if (cache_is_recent) {
     
     message("Loading NYC 311 data from local cache...")
@@ -34,7 +44,7 @@ get_311_data <- function(
   }
   
   
-  # Otherwise, try to retrieve fresh data from NYC Open Data
+  # Otherwise, attempt to retrieve fresh NYC 311 data
   message("Retrieving fresh NYC 311 data...")
   
   fresh_data <- tryCatch(
@@ -60,8 +70,7 @@ get_311_data <- function(
   )
   
   
-  # If fresh data was retrieved successfully,
-  # save it to the cache and return it
+  # Save successfully retrieved data to the local cache
   if (!is.null(fresh_data)) {
     
     dir.create(
@@ -81,7 +90,7 @@ get_311_data <- function(
   }
   
   
-  # If the API request failed, use the existing cache
+  # Fall back to an existing cache if the live request fails
   if (file.exists(cache_file)) {
     
     message(
@@ -94,7 +103,7 @@ get_311_data <- function(
   }
   
   
-  # Stop only if neither live nor cached data is available
+  # Stop if neither live nor cached data are available
   stop(
     paste(
       "Unable to retrieve NYC 311 data",
@@ -108,6 +117,7 @@ get_311_data <- function(
 # Clean and Prepare Data
 # ----------------------------------------
 
+# Remove records that do not contain an agency name.
 clean_311_data <- function(data) {
   
   data %>%
