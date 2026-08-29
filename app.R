@@ -3,6 +3,7 @@
 #
 
 # Core dashboard packages
+# Packages ####
 library(shiny)
 library(shinydashboard)
 library(shinythemes)
@@ -108,6 +109,14 @@ ui <- dashboardPage(
       start = min(
         as.Date(data_nyc$created_date),
         na.rm = TRUE
+    sidebarPanel(
+      
+      # Borough selector
+      selectInput(
+        "borough",
+        "Select Borough",
+        choices = get_borough_choices(data_nyc),
+        selected = "All"
       ),
       end = max(
         as.Date(data_nyc$created_date),
@@ -221,9 +230,7 @@ ui <- dashboardPage(
 )
 
 
-# -------------------------
-# Server Logic
-# -------------------------
+# Server Logic ####
 
 server <- function(input, output) {
   
