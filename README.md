@@ -1,127 +1,186 @@
-# NYC 311 Dashboard
+# NYC 311 Interactive Dashboard
 
-An interactive dashboard for exploring **NYC 311 service request data**, 
-developed through the **NYC Open Data Lab**.
+An interactive R Shiny dashboard for exploring NYC 311 service request data from NYC Open Data.
 
-## About
+The dashboard allows users to explore recent 311 service requests by borough, ZIP code, complaint type, agency, and date range. Interactive visualizations and summary metrics update automatically based on the selected filters.
 
-The **NYC 311 Dashboard** is an open-source project designed to make 
-New York City's 311 service request data easier to explore, visualize, 
-and understand.
+## Features
 
-Using publicly available data from NYC Open Data, the dashboard provides 
-an interactive interface for examining patterns in 311 requests across 
-New York City.
+The dashboard includes:
 
-The project is being developed as part of the **NYC Open Data Lab**, with 
-an emphasis on open data, reproducible workflows, accessible data 
-visualization, and hands-on student development experience.
+- Interactive filtering by borough
+- Searchable ZIP code filtering
+- Filtering by complaint type
+- Filtering by NYC agency
+- Custom date range selection
+- Total request count
+- Most common complaint type
+- Agency receiving the most requests
+- Interactive time-series visualization of requests over time
+- Borough comparison chart
+- Top 10 agency chart
+- Top 10 complaint type chart
+- Interactive Plotly tooltips
+- Graceful handling of filter combinations with no matching records
+- Local data caching to improve loading speed and provide a fallback when the NYC Open Data API is temporarily unavailable
 
-## Project Goals
+## Built With
 
-The dashboard is designed to provide users with an accessible way to 
-explore NYC 311 data without requiring them to directly query or analyze 
-the underlying dataset.
-
-The project focuses on:
-
-- retrieving and preparing NYC 311 service request data;
-- creating reproducible data processing workflows;
-- developing interactive visualizations and summaries;
-- allowing users to explore patterns across time, geography, and 
-  complaint characteristics;
-- designing an accessible and intuitive user interface; and
-- demonstrating how open government data can be transformed into 
-  useful public-facing tools.
+- R
+- Shiny
+- shinydashboard
+- tidyverse
+- ggplot2
+- Plotly
+- nycOpenData
 
 ## Data Source
 
-Data used in this project are provided through **NYC Open Data** and the 
-NYC 311 service request dataset.
+The dashboard uses NYC 311 Service Requests data available through NYC Open Data.
 
-NYC 311 data contain information about service requests submitted by 
-residents and other users of the 311 system, including information such as:
+Dataset ID:
 
-- complaint type;
-- date and time;
-- responding agency;
-- geographic location;
-- borough; and
-- request status.
+`erm2-nwe9`
 
-The specific variables and time periods used by the dashboard may evolve 
-as development continues.
+Data are retrieved using the `nycOpenData` R package.
 
-## Development
+The dashboard currently retrieves up to 50,000 recent service requests for interactive exploration.
 
-The dashboard is developed primarily using **R** and **Shiny**.
+## Installation
 
-The development workflow separates data acquisition and preparation from 
-the application itself, helping keep the project reproducible and easier 
-to maintain.
+### 1. Clone the Repository
 
-Core technologies include:
+Clone the repository from GitHub:
 
-- **R** for data processing and analysis;
-- **Shiny** for the interactive dashboard;
-- **NYC Open Data** as the primary data source;
-- **Git and GitHub** for version control and collaborative development; and
-- reproducible R workflows for preparing and updating application data.
+```bash
+git clone https://github.com/nyc-open-data-lab/nyc-311-dashboard.git
+```
 
-## Repository Structure
+Then open the project in RStudio.
 
-This repository contains the code and supporting files used to develop the 
-NYC 311 Dashboard.
+### 2. Install Required R Packages
 
-As the project develops, the repository may include components for:
+Install the required packages if they are not already installed:
 
-- data retrieval;
-- data cleaning and transformation;
-- reusable R functions;
-- dashboard user interface components;
-- server-side application logic;
-- visualizations;
-- testing; and
-- supporting assets.
+```r
+install.packages(c(
+  "shiny",
+  "shinydashboard",
+  "shinythemes",
+  "tidyverse",
+  "plotly"
+))
+```
 
-## Development Plan
+Install `nycOpenData` if needed:
 
-The dashboard is supported by a separate project development guide that 
-documents the planned development process, milestones, and workflow.
+```r
+install.packages("nycOpenData")
+```
 
-The development plan includes stages for:
+### 3. Run the Dashboard
 
-1. project setup;
-2. dashboard prototyping;
-3. development of the data pipeline;
-4. implementation of interactivity;
-5. visual and interface design;
-6. testing and refinement; and
-7. final release.
+Open `app.R` in RStudio and click **Run App**, or run:
 
-This separation allows this repository to remain focused on the **application 
-and its code**, while the accompanying documentation focuses on **how the 
-project is planned and developed**.
+```r
+shiny::runApp()
+```
 
-## NYC Open Data Lab
+The dashboard will open in the RStudio Viewer or your web browser.
 
-This project is developed through the **NYC Open Data Lab**, an open-source 
-initiative focused on expanding access to civic data through software, 
-analysis, education, and public-facing data tools.
+## Data Caching
 
-The Lab develops projects that make public data easier to access, analyze, 
-teach with, and understand.
+To improve startup speed and reduce repeated API requests, the application uses a local cache for NYC 311 data.
 
-## Contributors
+The cache file is stored locally at:
 
-This project is developed collaboratively through the NYC Open Data Lab.
+```text
+data/311_cache.rds
+```
 
-Contributors are recognized through the repository's Git history and project 
-documentation.
+This file is excluded from Git using `.gitignore` and is not included in the repository.
 
-## Status
+When a local cache is unavailable, the application retrieves data from NYC Open Data and creates a new cache for future use.
 
-**In active development.**
+If the NYC Open Data API is temporarily unavailable and a local cache exists, the application can use the cached data as a fallback.
 
-Features, data pipelines, visualizations, and documentation may change as 
-the dashboard continues to be developed and tested.
+## Dashboard Filters
+
+Users can filter service requests using:
+
+- **Borough** — Explore requests within a selected NYC borough.
+- **ZIP Code** — Search for requests within a specific ZIP code.
+- **Complaint Type** — Filter requests by the type of reported issue.
+- **Agency** — Filter requests based on the NYC agency responsible for the request.
+- **Date Range** — Limit results to a selected period.
+
+Filters can also be combined for more specific exploration.
+
+## Visualizations
+
+### 311 Requests Over Time
+
+Displays the number of service requests submitted each day within the selected filters.
+
+### Borough Comparison
+
+Compares the number of service requests across NYC boroughs.
+
+### Top 10 Agencies
+
+Displays the agencies receiving the greatest number of service requests within the selected filters.
+
+### Top 10 Complaint Types
+
+Displays the most common complaint types within the selected filters.
+
+All visualizations update reactively when filters are changed.
+
+## Project Structure
+
+```text
+nyc-311-dashboard/
+├── app.R
+├── R/
+│   ├── data.R
+│   ├── helpers.R
+│   └── plots.R
+├── www/
+│   └── custom.css
+├── data/
+├── .gitignore
+├── README.md
+└── nyc-311-app.Rproj
+```
+
+### `app.R`
+
+Defines the Shiny user interface, server logic, reactive filtering, summary value boxes, and interactive Plotly outputs.
+
+### `R/data.R`
+
+Contains functions for retrieving, caching, and cleaning NYC 311 data.
+
+### `R/helpers.R`
+
+Contains reusable helper functions used to generate dashboard filter choices.
+
+### `R/plots.R`
+
+Contains reusable functions for creating the dashboard visualizations.
+
+### `www/custom.css`
+
+Contains custom CSS used to style and polish the dashboard interface.
+
+## Error Handling
+
+The dashboard is designed to handle filter combinations that return no matching service requests. When no data match the selected filters, the visualizations display a message rather than producing an application error.
+
+The data-loading workflow also provides a local cache fallback when possible if the NYC Open Data API is temporarily unavailable.
+
+## Repository Status
+
+This dashboard was developed as part of the NYC Open Data Lab internship program.
+
+The project is currently being tested and prepared for public release.

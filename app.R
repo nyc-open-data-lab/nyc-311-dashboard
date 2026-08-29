@@ -1,53 +1,114 @@
 #
-# This is a Shiny web application. You can run the application by clicking
-# the 'Run App' button above.
+# NYC 311 Shiny Dashboard
 #
-# Find out more about building applications with Shiny here:
-#
-# https://shiny.posit.co/
-#
+
+# Core dashboard packages
 # Packages ####
 library(shiny)
 library(shinydashboard)
 library(shinythemes)
 library(tidyverse)
-library(DT)
 library(plotly)
+
+# NYC Open Data helper package
 library(nycOpenData)
 
 
 # -------------------------
-# Load Helper Scripts
+# Load Project Scripts
 # -------------------------
 
+# Data retrieval and cleaning functions
 source("R/data.R")
+
+# Reusable plotting functions
 source("R/plots.R")
+
+# Helper functions for dashboard filters
 source("R/helpers.R")
 
 
 # -------------------------
-# Load and Clean Data
+# Load and Prepare Data
 # -------------------------
 
-trying <- get_311_data()
-trying <- clean_311_data(trying)
+# Retrieve recent NYC 311 data.
+# The data function uses a local cache when available
+# to improve startup speed and reduce repeated API requests.
+data_nyc <- get_311_data()
+
+# Remove records that are missing required agency information.
+data_nyc <- clean_311_data(data_nyc)
 
 
 # -------------------------
 # User Interface
 # -------------------------
 
-ui <- fluidPage(
+ui <- dashboardPage(
   
-  # Application title
-  titlePanel("NYC 311 Data"),
+  # Dashboard header
+  dashboardHeader(
+    title = "NYC 311 Dashboard"
+  ),
   
-  sidebarLayout(
+  
+  # -------------------------
+  # Sidebar Filters
+  # -------------------------
+  
+  dashboardSidebar(
     
-    # -------------------------
-    # Sidebar Controls
-    # -------------------------
+    sidebarMenu(
+      menuItem(
+        "Dashboard",
+        tabName = "dashboard",
+        icon = icon("chart-bar")
+      )
+    ),
     
+    # Filter requests by NYC borough
+    selectInput(
+      "borough",
+      "Select Borough",
+      choices = get_borough_choices(data_nyc),
+      selected = "All"
+    ),
+    
+    # Search and filter requests by ZIP code
+    selectizeInput(
+      "zip_code",
+      "Select ZIP Code",
+      choices = get_zip_choices(data_nyc),
+      selected = "All",
+      options = list(
+        placeholder = "Search ZIP code"
+      )
+    ),
+    
+    # Filter requests by complaint category
+    selectInput(
+      "complaint_type",
+      "Select Complaint Type",
+      choices = get_complaint_choices(data_nyc),
+      selected = "All"
+    ),
+    
+    # Filter requests by responsible NYC agency
+    selectInput(
+      "agency",
+      "Select Agency",
+      choices = get_agency_choices(data_nyc),
+      selected = "All"
+    ),
+    
+    # Filter requests by creation date
+    dateRangeInput(
+      "date_range",
+      "Select Date Range",
+      start = min(
+        as.Date(data_nyc$created_date),
+        na.rm = TRUE
     sidebarPanel(
       
       # Borough selector
@@ -57,91 +118,113 @@ ui <- fluidPage(
         choices = get_borough_choices(data_nyc),
         selected = "All"
       ),
-      
-      # Complaint type selector
-      selectInput(
-        "complaint_type",
-        "Select Complaint Type",
-        choices = get_complaint_choices(trying),
-        selected = "All"
+      end = max(
+        as.Date(data_nyc$created_date),
+        na.rm = TRUE
       ),
-      
-      # Agency selector
-      selectInput(
-        "agency",
-        "Select Agency",
-        choices = get_agency_choices(trying),
-        selected = "All"
+      min = min(
+        as.Date(data_nyc$created_date),
+        na.rm = TRUE
       ),
-      
-      # Date range selector
-      dateRangeInput(
-        "date_range",
-        "Select Date Range",
-        start = min(as.Date(trying$created_date), na.rm = TRUE),
-        end = max(as.Date(trying$created_date), na.rm = TRUE),
-        min = min(as.Date(trying$created_date), na.rm = TRUE),
-        max = max(as.Date(trying$created_date), na.rm = TRUE)
+      max = max(
+        as.Date(data_nyc$created_date),
+        na.rm = TRUE
+      )
+    )
+  ),
+  
+  
+  # -------------------------
+  # Main Dashboard
+  # -------------------------
+  
+  dashboardBody(
+    
+    # Load custom CSS from the www/ directory
+    tags$head(
+      tags$link(
+        rel = "stylesheet",
+        type = "text/css",
+        href = "custom.css"
       )
     ),
     
-    
-    # -------------------------
-    # Main Dashboard Content
-    # -------------------------
-    
-    mainPanel(
+    tabItems(
       
-      # Complaint count
-      h3("Complaint Count"),
-      
-      textOutput("complaintCount"),
-      
-      br(),
-      
-      
-      # Time series
-      h3("311 Requests Over Time"),
-      
-      plotlyOutput("timeSeriesPlot"),
-      
-      br(),
-      
-      # Borough comparison
-      h3("Borough Comparison"),
-      
-      plotlyOutput("boroughPlot"),
-      
-      br(),
-      
-      # Agency visualization
-      h3("Top 10 Agencies Receiving 311 Requests"),
-      
-      plotlyOutput("distPlot"),
-      
-      br(),
-      
-      
-      # Complaint type visualization
-      h3("Top 10 Complaint Types"),
-      
-      plotlyOutput("complaintPlot"),
-      
-      br(),
-      
-      
-      # Top complaints table
-      h3("Top Complaints Table"),
-      
-      DTOutput("complaintTable"),
-      
-      br(),
-      
-      
-      # Agency summary table
-      h3("Agency Summary Table"),
-      
-      DTOutput("agencyTable")
+      tabItem(
+        tabName = "dashboard",
+        
+        
+        # -------------------------
+        # Summary Value Boxes
+        # -------------------------
+        
+        fluidRow(
+          
+          valueBoxOutput(
+            "totalRequestsBox",
+            width = 4
+          ),
+          
+          valueBoxOutput(
+            "topComplaintBox",
+            width = 4
+          ),
+          
+          valueBoxOutput(
+            "topAgencyBox",
+            width = 4
+          )
+        ),
+        
+        
+        # -------------------------
+        # Time Series + Borough Comparison
+        # -------------------------
+        
+        fluidRow(
+          
+          box(
+            title = "311 Requests Over Time",
+            width = 6,
+            status = "primary",
+            solidHeader = TRUE,
+            plotlyOutput("timeSeriesPlot")
+          ),
+          
+          box(
+            title = "Borough Comparison",
+            width = 6,
+            status = "primary",
+            solidHeader = TRUE,
+            plotlyOutput("boroughPlot")
+          )
+        ),
+        
+        
+        # -------------------------
+        # Agency + Complaint Charts
+        # -------------------------
+        
+        fluidRow(
+          
+          box(
+            title = "Top 10 Agencies",
+            width = 6,
+            status = "primary",
+            solidHeader = TRUE,
+            plotlyOutput("distPlot")
+          ),
+          
+          box(
+            title = "Top 10 Complaint Types",
+            width = 6,
+            status = "primary",
+            solidHeader = TRUE,
+            plotlyOutput("complaintPlot")
+          )
+        )
+      )
     )
   )
 )
@@ -153,14 +236,14 @@ server <- function(input, output) {
   
   
   # -------------------------
-  # Filter Data
+  # Reactive Data Filtering
   # -------------------------
   
-  # Filter the dataset based on user selections
+  # Start with the full dataset and apply each selected
+  # dashboard filter in sequence.
   filtered_data <- reactive({
     
-    # Create a working copy of the original data
-    dat <- trying
+    dat <- data_nyc
     
     
     # Filter by borough
@@ -168,7 +251,20 @@ server <- function(input, output) {
         input$borough != "All") {
       
       dat <- dat %>%
-        filter(borough == input$borough)
+        filter(
+          borough == input$borough
+        )
+    }
+    
+    
+    # Filter by ZIP code
+    if (!is.null(input$zip_code) &&
+        input$zip_code != "All") {
+      
+      dat <- dat %>%
+        filter(
+          incident_zip == input$zip_code
+        )
     }
     
     
@@ -177,7 +273,9 @@ server <- function(input, output) {
         input$complaint_type != "All") {
       
       dat <- dat %>%
-        filter(complaint_type == input$complaint_type)
+        filter(
+          complaint_type == input$complaint_type
+        )
     }
     
     
@@ -186,11 +284,13 @@ server <- function(input, output) {
         input$agency != "All") {
       
       dat <- dat %>%
-        filter(agency_name == input$agency)
+        filter(
+          agency_name == input$agency
+        )
     }
     
     
-    # Filter by date range
+    # Filter by selected date range
     if (!is.null(input$date_range)) {
       
       dat <- dat %>%
@@ -201,67 +301,119 @@ server <- function(input, output) {
     }
     
     
-    # Return the filtered dataset
+    # Return the filtered dataset for downstream outputs
     dat
   })
   
   
   # -------------------------
-  # Complaint Count
+  # Summary Data
   # -------------------------
   
-  # Display the number of complaints matching the selected filters
-  output$complaintCount <- renderText({
-    
-    paste(
-      scales::comma(nrow(filtered_data())),
-      "311 Requests"
-    )
-  })
-  
-  
-  # -------------------------
-  # Agency Summary
-  # -------------------------
-  
-  # Summarize the number of requests submitted to each agency
+  # Count requests by agency and rank from highest to lowest.
   agency_summary <- reactive({
     
     filtered_data() %>%
-      filter(!is.na(agency_name)) %>%
+      filter(
+        !is.na(agency_name)
+      ) %>%
       count(
         agency_name,
         name = "n"
       ) %>%
-      arrange(desc(n))
+      arrange(
+        desc(n)
+      )
   })
   
   
-  # -------------------------
-  # Complaint Summary
-  # -------------------------
-  
-  # Summarize the number of requests for each complaint type
+  # Count requests by complaint type and rank from highest
+  # to lowest.
   complaint_summary <- reactive({
     
     filtered_data() %>%
-      filter(!is.na(complaint_type)) %>%
+      filter(
+        !is.na(complaint_type)
+      ) %>%
       count(
         complaint_type,
         name = "n"
       ) %>%
-      arrange(desc(n))
+      arrange(
+        desc(n)
+      )
   })
   
   
   # -------------------------
-  # Time Series Plot
+  # Summary Value Boxes
   # -------------------------
   
-  # Render an interactive time-series chart
+  # Display the total number of requests matching the
+  # currently selected filters.
+  output$totalRequestsBox <- renderValueBox({
+    
+    valueBox(
+      value = scales::comma(
+        nrow(filtered_data())
+      ),
+      subtitle = "Total Requests",
+      icon = icon("list"),
+      color = "blue"
+    )
+  })
+  
+  
+  # Display the most common complaint type in the
+  # currently filtered dataset.
+  output$topComplaintBox <- renderValueBox({
+    
+    top_complaint <- complaint_summary() %>%
+      slice_head(n = 1)
+    
+    valueBox(
+      value = ifelse(
+        nrow(top_complaint) == 0,
+        "No Data",
+        top_complaint$complaint_type
+      ),
+      subtitle = "Top Complaint",
+      icon = icon("exclamation-circle"),
+      color = "yellow"
+    )
+  })
+  
+  
+  # Display the agency receiving the greatest number
+  # of requests in the currently filtered dataset.
+  output$topAgencyBox <- renderValueBox({
+    
+    top_agency <- agency_summary() %>%
+      slice_head(n = 1)
+    
+    valueBox(
+      value = ifelse(
+        nrow(top_agency) == 0,
+        "No Data",
+        top_agency$agency_name
+      ),
+      subtitle = "Top Agency",
+      icon = icon("building"),
+      color = "green"
+    )
+  })
+  
+  
+  # -------------------------
+  # Interactive Visualizations
+  # -------------------------
+  
+  # Display request volume over time.
   output$timeSeriesPlot <- renderPlotly({
     
-    plot <- create_time_series_plot(filtered_data())
+    plot <- create_time_series_plot(
+      filtered_data()
+    )
     
     ggplotly(
       plot,
@@ -269,14 +421,13 @@ server <- function(input, output) {
     )
   })
   
-  # -------------------------
-  # Borough Comparison Plot
-  # -------------------------
   
-  # Render an interactive bar chart comparing boroughs
+  # Compare request volume across NYC boroughs.
   output$boroughPlot <- renderPlotly({
     
-    plot <- create_borough_plot(filtered_data())
+    plot <- create_borough_plot(
+      filtered_data()
+    )
     
     ggplotly(
       plot,
@@ -284,14 +435,13 @@ server <- function(input, output) {
     )
   })
   
-  # -------------------------
-  # Agency Plot
-  # -------------------------
   
-  # Render an interactive bar chart of the top agencies
+  # Display the agencies receiving the most requests.
   output$distPlot <- renderPlotly({
     
-    plot <- create_agency_plot(filtered_data())
+    plot <- create_agency_plot(
+      filtered_data()
+    )
     
     ggplotly(
       plot,
@@ -300,74 +450,23 @@ server <- function(input, output) {
   })
   
   
-  # -------------------------
-  # Complaint Type Plot
-  # -------------------------
-  
-  # Render an interactive bar chart of the top complaint types
+  # Display the most common complaint types.
   output$complaintPlot <- renderPlotly({
     
-    plot <- create_complaint_plot(filtered_data())
+    plot <- create_complaint_plot(
+      filtered_data()
+    )
     
     ggplotly(
       plot,
       tooltip = "text"
     )
   })
-  
-  
-  # -------------------------
-  # Top Complaints Table
-  # -------------------------
-  
-  # Render an interactive table of the top complaint types
-  output$complaintTable <- renderDT({
-    
-    complaint_summary() %>%
-      slice_head(n = 10) %>%
-      rename(
-        `Complaint Type` = complaint_type,
-        `Number of Requests` = n
-      )
-    
-  },
-  options = list(
-    pageLength = 10,
-    order = list(
-      list(1, "desc")
-    )
-  ),
-  rownames = FALSE
-  )
-  
-  
-  # -------------------------
-  # Agency Summary Table
-  # -------------------------
-  
-  # Render an interactive table of agency request counts
-  output$agencyTable <- renderDT({
-    
-    agency_summary() %>%
-      rename(
-        Agency = agency_name,
-        `Number of Requests` = n
-      )
-    
-  },
-  options = list(
-    pageLength = 10,
-    order = list(
-      list(1, "desc")
-    )
-  ),
-  rownames = FALSE
-  )
 }
 
 
 # -------------------------
-# Run Application
+# Launch Application
 # -------------------------
 
 shinyApp(
