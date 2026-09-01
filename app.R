@@ -2,6 +2,10 @@
 # NYC 311 Shiny Dashboard
 #
 
+# -------------------------
+# Packages
+# -------------------------
+
 # Core dashboard packages
 library(shiny)
 library(shinydashboard)

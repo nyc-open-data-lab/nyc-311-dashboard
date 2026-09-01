@@ -196,7 +196,7 @@ Contains custom CSS used to style and polish the dashboard interface.
 
 The dashboard is designed to handle filter combinations that return no matching service requests without causing the application to crash.
 
-When no records match the selected filters, the dashboard summary displays zero requests and "No Data" where appropriate. The chart outputs also provide no-data handling for empty filter results.
+When no records match the selected filters, the dashboard summary displays zero requests and "No Data" where appropriate. The visualizations also provide no-data handling for empty filter results.
 
 The data-loading workflow uses a local cache as a fallback when possible if the NYC Open Data API is temporarily unavailable.
 
@@ -226,4 +226,4 @@ Potential future extensions of the dashboard include:
 
 This dashboard was developed as part of the NYC Open Data Lab internship program.
 
-The application has been tested for dashboard filtering, interactive visualization, empty-result handling, and data-loading behavior and is being finalized for public release.
+The application has been tested for dashboard filtering, interactive visualization, empty-result handling, and data-loading behavior and is ready for public release and future extension.
