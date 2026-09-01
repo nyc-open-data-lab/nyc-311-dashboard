@@ -24,7 +24,7 @@ create_agency_plot <- function(data) {
     )
   
   
-  # Display a message if no records match the selected filters
+  # Display a message if no records match the selected filters.
   if (nrow(plot_data) == 0) {
     
     return(
@@ -111,7 +111,7 @@ create_complaint_plot <- function(data) {
     )
   
   
-  # Display a message if no records match the selected filters
+  # Display a message if no records match the selected filters.
   if (nrow(plot_data) == 0) {
     
     return(
@@ -194,7 +194,7 @@ create_time_series_plot <- function(data) {
     )
   
   
-  # Display a message if no records match the selected filters
+  # Display a message if no records match the selected filters.
   if (nrow(plot_data) == 0) {
     
     return(
@@ -245,81 +245,90 @@ create_time_series_plot <- function(data) {
 
 
 # ----------------------------------------
-# Borough Comparison Plot
+# NYC 311 Request Map
 # ----------------------------------------
 
-# Create a horizontal bar chart comparing the number
-# of NYC 311 requests across boroughs.
-create_borough_plot <- function(data) {
+# Create an interactive map of NYC 311 requests
+# with points color-coded by borough.
+create_311_map <- function(data) {
   
-  plot_data <- data %>%
+  # Keep only records with valid geographic coordinates
+  # and one of the five recognized NYC boroughs.
+  map_data <- data %>%
     filter(
-      !is.na(borough)
-    ) %>%
-    count(
-      borough,
-      name = "n"
-    ) %>%
-    arrange(
-      desc(n)
+      !is.na(latitude),
+      !is.na(longitude),
+      !is.na(borough),
+      borough %in% c(
+        "BRONX",
+        "BROOKLYN",
+        "MANHATTAN",
+        "QUEENS",
+        "STATEN ISLAND"
+      )
     )
   
   
-  # Display a message if no records match the selected filters
-  if (nrow(plot_data) == 0) {
+  # Display a message if no mappable records match
+  # the selected filters.
+  if (nrow(map_data) == 0) {
     
     return(
-      ggplot() +
-        annotate(
-          "text",
-          x = 0,
-          y = 0,
-          label = "No 311 requests match the selected filters",
-          size = 5
-        ) +
-        xlim(-1, 1) +
-        ylim(-1, 1) +
-        theme_void()
+      leaflet() %>%
+        addTiles() %>%
+        setView(
+          lng = -74.0060,
+          lat = 40.7128,
+          zoom = 10
+        ) %>%
+        addControl(
+          html = paste0(
+            "<div style='font-size: 18px;",
+            " background-color: white;",
+            " padding: 10px;",
+            " border-radius: 4px;'>",
+            "No 311 requests match the selected filters",
+            "</div>"
+          ),
+          position = "topright"
+        )
     )
   }
   
   
-  ggplot(
-    plot_data,
-    aes(
-      x = reorder(
-        borough,
-        n
-      ),
-      y = n,
-      text = paste0(
-        "Borough: ",
-        borough,
-        "<br>Requests: ",
-        scales::comma(n)
-      )
+  # Create a consistent color for each borough.
+  borough_colors <- colorFactor(
+    palette = "Set1",
+    domain = c(
+      "BRONX",
+      "BROOKLYN",
+      "MANHATTAN",
+      "QUEENS",
+      "STATEN ISLAND"
     )
-  ) +
-    geom_col(
-      fill = "#2C7FB8"
-    ) +
-    geom_text(
-      aes(
-        label = scales::comma(n)
-      ),
-      hjust = -0.1,
-      size = 3.5
-    ) +
-    coord_flip() +
-    scale_y_continuous(
-      expand = expansion(
-        mult = c(0, 0.15)
+  )
+
+  # Create the interactive map.
+  leaflet(map_data) %>%
+    addTiles() %>%
+    addCircleMarkers(
+      lng = ~longitude,
+      lat = ~latitude,
+      radius = 4,
+      stroke = FALSE,
+      fillOpacity = 0.6,
+      color = ~borough_colors(borough),
+      popup = ~paste0(
+        "<strong>Borough:</strong> ", borough,
+        "<br><strong>Complaint:</strong> ", complaint_type,
+        "<br><strong>Agency:</strong> ", agency_name
       )
-    ) +
-    labs(
-      title = "311 Requests by Borough",
-      x = "Borough",
-      y = "Number of Requests"
-    ) +
-    theme_minimal()
+    ) %>%
+    addLegend(
+      position = "bottomright",
+      pal = borough_colors,
+      values = ~borough,
+      title = "Borough",
+      opacity = 1
+    )
 }
