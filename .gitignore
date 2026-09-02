@@ -3,3 +3,4 @@
 .RData
 .Ruserdata
 data/311_cache.rds
+.DS_Store

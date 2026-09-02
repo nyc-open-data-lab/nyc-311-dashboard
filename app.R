@@ -2,13 +2,17 @@
 # NYC 311 Shiny Dashboard
 #
 
+# -------------------------
+# Packages
+# -------------------------
+
 # Core dashboard packages
-# Packages ####
 library(shiny)
 library(shinydashboard)
 library(shinythemes)
 library(tidyverse)
 library(plotly)
+library(leaflet)
 
 # NYC Open Data helper package
 library(nycOpenData)
@@ -109,14 +113,6 @@ ui <- dashboardPage(
       start = min(
         as.Date(data_nyc$created_date),
         na.rm = TRUE
-    sidebarPanel(
-      
-      # Borough selector
-      selectInput(
-        "borough",
-        "Select Borough",
-        choices = get_borough_choices(data_nyc),
-        selected = "All"
       ),
       end = max(
         as.Date(data_nyc$created_date),
@@ -179,7 +175,7 @@ ui <- dashboardPage(
         
         
         # -------------------------
-        # Time Series + Borough Comparison
+        # Time Series + Request Map
         # -------------------------
         
         fluidRow(
@@ -193,11 +189,14 @@ ui <- dashboardPage(
           ),
           
           box(
-            title = "Borough Comparison",
+            title = "311 Request Map",
             width = 6,
             status = "primary",
             solidHeader = TRUE,
-            plotlyOutput("boroughPlot")
+            leafletOutput(
+              "requestMap",
+              height = 400
+            )
           )
         ),
         
@@ -230,7 +229,9 @@ ui <- dashboardPage(
 )
 
 
-# Server Logic ####
+# -------------------------
+# Server Logic
+# -------------------------
 
 server <- function(input, output) {
   
@@ -422,16 +423,11 @@ server <- function(input, output) {
   })
   
   
-  # Compare request volume across NYC boroughs.
-  output$boroughPlot <- renderPlotly({
+  # Display NYC 311 request locations on an interactive map.
+  output$requestMap <- renderLeaflet({
     
-    plot <- create_borough_plot(
+    create_311_map(
       filtered_data()
-    )
-    
-    ggplotly(
-      plot,
-      tooltip = "text"
     )
   })
   

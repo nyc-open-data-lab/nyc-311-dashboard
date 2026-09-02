@@ -69,13 +69,6 @@
 }
 
 
-/* Data tables */
-
-.dataTables_wrapper {
-  padding: 5px;
-}
-
-
 /* Make Plotly outputs fit neatly inside boxes */
 
 .plotly {
