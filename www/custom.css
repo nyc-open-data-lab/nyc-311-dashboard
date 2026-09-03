@@ -75,6 +75,7 @@
   width: 100% !important;
 }
 
+
 /* ----------------------------------------
    Value Box Text
    ---------------------------------------- */
@@ -89,8 +90,21 @@
   margin-right: 60px;
 }
 
+
 /* Keep value-box labels easy to read */
 
 .small-box p {
   font-size: 16px;
+}
+
+
+/* ----------------------------------------
+   Leaflet Map Styling
+   ---------------------------------------- */
+
+/* Mute only the basemap tiles so the colored
+   NYC 311 request markers remain vivid */
+
+.leaflet-tile-pane img.leaflet-tile {
+  filter: grayscale(100%) saturate(0%) brightness(1.12) contrast(0.85);
 }
