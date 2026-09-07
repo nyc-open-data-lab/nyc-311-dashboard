@@ -2,7 +2,7 @@
 
 An interactive R Shiny dashboard for exploring NYC 311 service request data from NYC Open Data.
 
-The dashboard allows users to explore recent 311 service requests by borough, ZIP code, complaint type, agency, and date range. Interactive visualizations and summary metrics update automatically based on the selected filters.
+The dashboard allows users to explore approximately one year of 311 service requests by borough, ZIP code, complaint type, agency, and date range. Interactive visualizations and summary metrics update automatically based on the selected filters.
 
 ## Features
 
@@ -45,7 +45,11 @@ Dataset ID:
 
 Data are retrieved using the `nycOpenData` R package.
 
-The application retrieves up to 50,000 recent service requests for interactive exploration.
+The application retrieves approximately one year of NYC 311 service requests for interactive exploration. Because a full year contains millions of records, data are retrieved in smaller date-based chunks and combined into a complete dataset.
+
+If an individual API request reaches the 100,000-row retrieval limit, the application automatically divides that date range into smaller requests to avoid silently truncating the data.
+
+The most recent potentially incomplete day is excluded from the retrieval window so that the dashboard does not display a partially reported day as though it were complete.
 
 ## Installation
 
@@ -91,23 +95,31 @@ The dashboard will open in the RStudio Viewer or your web browser.
 
 ## Data Caching
 
-To reduce repeated API requests and provide a fallback when NYC Open Data is temporarily unavailable, the application uses a local cache for NYC 311 data.
+To reduce repeated API requests and provide a fallback when NYC Open Data is temporarily unavailable, the application uses local caching for NYC 311 data.
 
-The cache is stored locally at:
+The complete combined dataset is stored locally at:
 
 ```text
 data/311_cache.rds
 ```
 
-This file is excluded from Git using `.gitignore` and is not included in the repository.
+Individual successfully retrieved date chunks are stored in:
 
-When the application starts, it checks whether a recent cached dataset is available. If the cache is less than 24 hours old, the cached data are used.
+```text
+data/311_chunks/
+```
 
-If a recent cache is not available, the application attempts to retrieve fresh data from NYC Open Data and saves the retrieved data locally for future use.
+Both the complete cache and individual chunk files are excluded from Git using `.gitignore` and are not included in the repository.
 
-If the NYC Open Data request fails but an existing cache is available, the application uses the cached data as a fallback.
+When the application starts, it checks whether a recent complete cached dataset is available. If the cache is less than 24 hours old, the cached data are used.
 
-If neither live data nor a cached dataset is available, the application stops and displays an error message.
+If a recent complete cache is not available, the application retrieves the approximately one-year dataset in smaller date-based chunks. Successfully retrieved chunks are saved individually so they can be reused if an API request fails before the full refresh is completed.
+
+If a requested chunk reaches the 100,000-row API limit, the application automatically divides that date range into smaller requests and combines the results.
+
+After all required chunks are successfully retrieved, they are combined and saved as the complete local cache.
+
+If the yearly refresh cannot be completed but an older complete cache is available, the application uses that dataset as a fallback. If neither a complete refresh nor an existing complete cache is available, the application stops and displays an error message.
 
 ## Dashboard Filters
 
@@ -139,15 +151,17 @@ Displays the number of service requests submitted each day within the selected f
 
 ### NYC 311 Request Map
 
-Displays the geographic locations of NYC 311 service requests using an interactive map. Request locations are color-coded by borough, and users can zoom, pan, and select individual points to view the borough, complaint type, and responsible agency.
+Displays the geographic locations of NYC 311 service requests using an interactive grayscale street map. Request locations are color-coded by borough, and users can zoom, pan, and select individual points to view the borough, complaint type, and responsible agency.
+
+To maintain dashboard responsiveness when a large number of requests match the selected filters, the map displays a reproducible sample of up to 10,000 request locations. Summary metrics, filters, and other visualizations continue to use the complete filtered dataset.
 
 ### Top 10 Agencies
 
-Displays the agencies associated with the greatest number of service requests within the selected filters.
+Displays the agencies associated with the greatest number of service requests within the selected filters. Agency acronyms are used where available to improve readability, while full agency names and exact request counts are available through interactive tooltips.
 
 ### Top 10 Complaint Types
 
-Displays the most common complaint types within the selected filters.
+Displays the most common complaint types within the selected filters. Exact request counts are available through interactive tooltips.
 
 The visualizations update reactively as dashboard filters are changed. Plotly charts include interactive tooltips, while the Leaflet map supports zooming, panning, and clickable request locations.
 
@@ -161,6 +175,7 @@ nyc-311-dashboard/
 │   ├── helpers.R
 │   └── plots.R
 ├── data/
+│   └── 311_chunks/
 ├── www/
 │   └── custom.css
 ├── .gitignore
@@ -174,7 +189,7 @@ Defines the Shiny user interface, server logic, reactive filtering, summary valu
 
 ### `R/data.R`
 
-Contains functions for retrieving, caching, and cleaning NYC 311 service request data.
+Contains functions for retrieving, caching, validating, and cleaning NYC 311 service request data. Large API requests are divided into smaller date ranges when necessary to avoid incomplete retrievals.
 
 ### `R/helpers.R`
 
@@ -186,11 +201,11 @@ Contains reusable functions for creating the dashboard visualizations and intera
 
 ### `data/`
 
-Stores the local NYC 311 data cache. The cached `.rds` file is excluded from version control.
+Stores the complete local NYC 311 cache and individual date-chunk caches used by the data retrieval workflow. These cached files are excluded from version control.
 
 ### `www/custom.css`
 
-Contains custom CSS used to style and polish the dashboard interface.
+Contains custom CSS used to style and polish the dashboard interface, including the grayscale Leaflet basemap treatment.
 
 ## Error Handling
 
@@ -198,7 +213,9 @@ The dashboard is designed to handle filter combinations that return no matching 
 
 When no records match the selected filters, the dashboard summary displays zero requests and "No Data" where appropriate. The visualizations also provide no-data handling for empty filter results.
 
-The data-loading workflow uses a local cache as a fallback when possible if the NYC Open Data API is temporarily unavailable.
+The data-loading workflow saves successfully retrieved date chunks as they are downloaded. If an API request fails during a yearly refresh, completed chunks remain available for reuse during a later attempt.
+
+If the refresh cannot be completed but an older complete cache is available, the dashboard uses the existing cached dataset as a fallback.
 
 ## Usage
 
@@ -218,7 +235,7 @@ Multiple filters can be applied at the same time.
 Potential future extensions of the dashboard include:
 
 - Additional geographic analysis and map features
-- Expanded historical data coverage
+- User-selectable historical periods beyond the current one-year window
 - Additional interactive visualizations
 - Alternative ways of representing NYC 311 data, including data sonification
 
@@ -226,4 +243,4 @@ Potential future extensions of the dashboard include:
 
 This dashboard was developed as part of the NYC Open Data Lab internship program.
 
-The application has been tested for dashboard filtering, interactive visualization, empty-result handling, and data-loading behavior and is ready for public release and future extension.
+The application has been tested for dashboard filtering, interactive visualization, empty-result handling, full-year data retrieval, and data-loading behavior and is ready for public release and future extension.
