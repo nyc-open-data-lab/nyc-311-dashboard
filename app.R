@@ -36,12 +36,12 @@ source("R/helpers.R")
 # Load and Prepare Data
 # -------------------------
 
-# Retrieve recent NYC 311 data.
+# Retrieve one year of NYC 311 data.
 # The data function uses a local cache when available
 # to improve startup speed and reduce repeated API requests.
 data_nyc <- get_311_data()
 
-# Remove records that are missing required agency information.
+# Clean the data and create a reusable request-date column.
 data_nyc <- clean_311_data(data_nyc)
 
 
@@ -50,19 +50,19 @@ data_nyc <- clean_311_data(data_nyc)
 # -------------------------
 
 ui <- dashboardPage(
-  
+
   # Dashboard header
   dashboardHeader(
     title = "NYC 311 Dashboard"
   ),
-  
-  
+
+
   # -------------------------
   # Sidebar Filters
   # -------------------------
-  
+
   dashboardSidebar(
-    
+
     sidebarMenu(
       menuItem(
         "Dashboard",
@@ -70,16 +70,16 @@ ui <- dashboardPage(
         icon = icon("chart-bar")
       )
     ),
-    
-    # Filter requests by NYC borough
+
+    # Filter requests by NYC borough.
     selectInput(
       "borough",
       "Select Borough",
       choices = get_borough_choices(data_nyc),
       selected = "All"
     ),
-    
-    # Search and filter requests by ZIP code
+
+    # Search and filter requests by ZIP code.
     selectizeInput(
       "zip_code",
       "Select ZIP Code",
@@ -89,54 +89,54 @@ ui <- dashboardPage(
         placeholder = "Search ZIP code"
       )
     ),
-    
-    # Filter requests by complaint category
+
+    # Filter requests by complaint category.
     selectInput(
       "complaint_type",
       "Select Complaint Type",
       choices = get_complaint_choices(data_nyc),
       selected = "All"
     ),
-    
-    # Filter requests by responsible NYC agency
+
+    # Filter requests by responsible NYC agency.
     selectInput(
       "agency",
       "Select Agency",
       choices = get_agency_choices(data_nyc),
       selected = "All"
     ),
-    
-    # Filter requests by creation date
+
+    # Filter requests by creation date.
     dateRangeInput(
       "date_range",
       "Select Date Range",
       start = min(
-        as.Date(data_nyc$created_date),
+        data_nyc$request_date,
         na.rm = TRUE
       ),
       end = max(
-        as.Date(data_nyc$created_date),
+        data_nyc$request_date,
         na.rm = TRUE
       ),
       min = min(
-        as.Date(data_nyc$created_date),
+        data_nyc$request_date,
         na.rm = TRUE
       ),
       max = max(
-        as.Date(data_nyc$created_date),
+        data_nyc$request_date,
         na.rm = TRUE
       )
     )
   ),
-  
-  
+
+
   # -------------------------
   # Main Dashboard
   # -------------------------
-  
+
   dashboardBody(
-    
-    # Load custom CSS from the www/ directory
+
+    # Load custom CSS from the www/ directory.
     tags$head(
       tags$link(
         rel = "stylesheet",
@@ -144,42 +144,42 @@ ui <- dashboardPage(
         href = "custom.css"
       )
     ),
-    
+
     tabItems(
-      
+
       tabItem(
         tabName = "dashboard",
-        
-        
+
+
         # -------------------------
         # Summary Value Boxes
         # -------------------------
-        
+
         fluidRow(
-          
+
           valueBoxOutput(
             "totalRequestsBox",
             width = 4
           ),
-          
+
           valueBoxOutput(
             "topComplaintBox",
             width = 4
           ),
-          
+
           valueBoxOutput(
             "topAgencyBox",
             width = 4
           )
         ),
-        
-        
+
+
         # -------------------------
         # Time Series + Request Map
         # -------------------------
-        
+
         fluidRow(
-          
+
           box(
             title = "311 Requests Over Time",
             width = 6,
@@ -187,7 +187,7 @@ ui <- dashboardPage(
             solidHeader = TRUE,
             plotlyOutput("timeSeriesPlot")
           ),
-          
+
           box(
             title = "311 Request Map",
             width = 6,
@@ -199,14 +199,14 @@ ui <- dashboardPage(
             )
           )
         ),
-        
-        
+
+
         # -------------------------
         # Agency + Complaint Charts
         # -------------------------
-        
+
         fluidRow(
-          
+
           box(
             title = "Top 10 Agencies",
             width = 6,
@@ -214,7 +214,7 @@ ui <- dashboardPage(
             solidHeader = TRUE,
             plotlyOutput("distPlot")
           ),
-          
+
           box(
             title = "Top 10 Complaint Types",
             width = 6,
@@ -234,86 +234,85 @@ ui <- dashboardPage(
 # -------------------------
 
 server <- function(input, output) {
-  
-  
+
+
   # -------------------------
   # Reactive Data Filtering
   # -------------------------
-  
-  # Start with the full dataset and apply each selected
-  # dashboard filter in sequence.
+
+  # Start with the full year-long dataset and apply each
+  # selected dashboard filter in sequence.
   filtered_data <- reactive({
-    
+
     dat <- data_nyc
-    
-    
-    # Filter by borough
+
+
+    # Filter by borough.
     if (!is.null(input$borough) &&
         input$borough != "All") {
-      
+
       dat <- dat %>%
         filter(
           borough == input$borough
         )
     }
-    
-    
-    # Filter by ZIP code
+
+
+    # Filter by ZIP code.
     if (!is.null(input$zip_code) &&
         input$zip_code != "All") {
-      
+
       dat <- dat %>%
         filter(
           incident_zip == input$zip_code
         )
     }
-    
-    
-    # Filter by complaint type
+
+
+    # Filter by complaint type.
     if (!is.null(input$complaint_type) &&
         input$complaint_type != "All") {
-      
+
       dat <- dat %>%
         filter(
           complaint_type == input$complaint_type
         )
     }
-    
-    
-    # Filter by agency
+
+
+    # Filter by agency.
     if (!is.null(input$agency) &&
         input$agency != "All") {
-      
+
       dat <- dat %>%
         filter(
           agency_name == input$agency
         )
     }
-    
-    
-    # Filter by selected date range
+
+
+    # Filter by selected date range.
     if (!is.null(input$date_range)) {
-      
+
       dat <- dat %>%
         filter(
-          as.Date(created_date) >= input$date_range[1],
-          as.Date(created_date) <= input$date_range[2]
+          request_date >= input$date_range[1],
+          request_date <= input$date_range[2]
         )
     }
-    
-    
-    # Return the filtered dataset for downstream outputs
+
+
+    # Return the filtered dataset for downstream outputs.
     dat
   })
-  
-  
+
   # -------------------------
   # Summary Data
   # -------------------------
-  
+
   # Count requests by agency and rank from highest to lowest.
   agency_summary <- reactive({
-    
+
     filtered_data() %>%
       filter(
         !is.na(agency_name)
@@ -326,12 +325,12 @@ server <- function(input, output) {
         desc(n)
       )
   })
-  
-  
+
+
   # Count requests by complaint type and rank from highest
   # to lowest.
   complaint_summary <- reactive({
-    
+
     filtered_data() %>%
       filter(
         !is.na(complaint_type)
@@ -344,16 +343,16 @@ server <- function(input, output) {
         desc(n)
       )
   })
-  
-  
+
+
   # -------------------------
   # Summary Value Boxes
   # -------------------------
-  
+
   # Display the total number of requests matching the
   # currently selected filters.
   output$totalRequestsBox <- renderValueBox({
-    
+
     valueBox(
       value = scales::comma(
         nrow(filtered_data())
@@ -363,15 +362,15 @@ server <- function(input, output) {
       color = "blue"
     )
   })
-  
-  
+
+
   # Display the most common complaint type in the
   # currently filtered dataset.
   output$topComplaintBox <- renderValueBox({
-    
+
     top_complaint <- complaint_summary() %>%
       slice_head(n = 1)
-    
+
     valueBox(
       value = ifelse(
         nrow(top_complaint) == 0,
@@ -383,15 +382,15 @@ server <- function(input, output) {
       color = "yellow"
     )
   })
-  
-  
+
+
   # Display the agency receiving the greatest number
   # of requests in the currently filtered dataset.
   output$topAgencyBox <- renderValueBox({
-    
+
     top_agency <- agency_summary() %>%
       slice_head(n = 1)
-    
+
     valueBox(
       value = ifelse(
         nrow(top_agency) == 0,
@@ -403,56 +402,56 @@ server <- function(input, output) {
       color = "green"
     )
   })
-  
-  
+
+
   # -------------------------
   # Interactive Visualizations
   # -------------------------
-  
+
   # Display request volume over time.
   output$timeSeriesPlot <- renderPlotly({
-    
+
     plot <- create_time_series_plot(
       filtered_data()
     )
-    
+
     ggplotly(
       plot,
       tooltip = "text"
     )
   })
-  
-  
+
+
   # Display NYC 311 request locations on an interactive map.
   output$requestMap <- renderLeaflet({
-    
+
     create_311_map(
       filtered_data()
     )
   })
-  
-  
+
+
   # Display the agencies receiving the most requests.
   output$distPlot <- renderPlotly({
-    
+
     plot <- create_agency_plot(
       filtered_data()
     )
-    
+
     ggplotly(
       plot,
       tooltip = "text"
     )
   })
-  
-  
+
+
   # Display the most common complaint types.
   output$complaintPlot <- renderPlotly({
-    
+
     plot <- create_complaint_plot(
       filtered_data()
     )
-    
+
     ggplotly(
       plot,
       tooltip = "text"

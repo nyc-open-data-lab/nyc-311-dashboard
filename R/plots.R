@@ -246,8 +246,8 @@ create_time_series_plot <- function(data) {
 # NYC 311 Request Map
 # ----------------------------------------
 
-# Create an interactive geographic visualization of
-# NYC 311 requests with points color-coded by borough.
+# Create an interactive NYC street map with
+# request points color-coded by borough.
 create_311_map <- function(data) {
 
   # Keep only records with valid geographic coordinates
@@ -267,8 +267,18 @@ create_311_map <- function(data) {
     )
 
 
-  # Load official NYC borough boundaries.
-  borough_boundaries <- get_borough_boundaries()
+  # Limit the number of points rendered on the map
+  # so the dashboard remains responsive when the
+  # full year of NYC 311 data is selected.
+  if (nrow(map_data) > 10000) {
+
+    set.seed(311)
+
+    map_data <- map_data %>%
+      slice_sample(
+        n = 10000
+      )
+  }
 
 
   # Display a message if no mappable records match
@@ -277,19 +287,11 @@ create_311_map <- function(data) {
 
     return(
       leaflet() %>%
-        addPolygons(
-          data = borough_boundaries,
-          color = "#8A8A8A",
-          weight = 1.5,
-          opacity = 1,
-          fillColor = "#F2F2F2",
-          fillOpacity = 1
-        ) %>%
-        fitBounds(
-          lng1 = -74.25559,
-          lat1 = 40.49613,
-          lng2 = -73.70001,
-          lat2 = 40.91553
+        addTiles() %>%
+        setView(
+          lng = -74.0060,
+          lat = 40.7128,
+          zoom = 10
         ) %>%
         addControl(
           html = paste0(
@@ -320,23 +322,14 @@ create_311_map <- function(data) {
 
 
   # Create the interactive map.
-  leaflet() %>%
+  leaflet(map_data) %>%
 
-    # Draw official NYC borough boundaries first
-    # so the request points remain visually dominant.
-    addPolygons(
-      data = borough_boundaries,
-      color = "#8A8A8A",
-      weight = 1.5,
-      opacity = 1,
-      fillColor = "#F2F2F2",
-      fillOpacity = 1,
-      smoothFactor = 0.5
-    ) %>%
+    # Use the standard OpenStreetMap street layout.
+    # The tile layer is converted to grayscale in custom.css.
+    addTiles() %>%
 
     # Overlay NYC 311 requests.
     addCircleMarkers(
-      data = map_data,
       lng = ~longitude,
       lat = ~latitude,
       radius = 5,

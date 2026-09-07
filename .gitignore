@@ -3,6 +3,7 @@
 .RData
 .Ruserdata
 data/311_cache.rds
+data/311_chunks/
 data/borough_boundaries.rds
 
 .DS_Store
