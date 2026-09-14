@@ -10,7 +10,7 @@
 # Keep only the fields used by the dashboard and make
 # their data types consistent across API requests.
 standardize_311_columns <- function(data) {
-
+  
   data %>%
     transmute(
       created_date = as.character(created_date),
@@ -38,8 +38,7 @@ retrieve_311_chunk <- function(
     row_limit = 100000,
     timeout_sec = 180
 ) {
-
-  # Create a cache filename for this exact date range.
+  
   chunk_file <- file.path(
     chunk_cache_dir,
     paste0(
@@ -50,14 +49,14 @@ retrieve_311_chunk <- function(
       ".rds"
     )
   )
-
-
+  
+  
   # ----------------------------------------
   # Use Existing Chunk Cache
   # ----------------------------------------
-
+  
   if (file.exists(chunk_file)) {
-
+    
     message(
       paste0(
         "Loading cached chunk ",
@@ -67,23 +66,23 @@ retrieve_311_chunk <- function(
         "..."
       )
     )
-
+    
     cached_data <- readRDS(
       chunk_file
     )
-
+    
     return(
       standardize_311_columns(
         cached_data
       )
     )
   }
-
-
+  
+  
   # ----------------------------------------
   # Retrieve Chunk
   # ----------------------------------------
-
+  
   message(
     paste0(
       "Retrieving ",
@@ -93,10 +92,10 @@ retrieve_311_chunk <- function(
       "..."
     )
   )
-
-
+  
+  
   chunk_data <- tryCatch(
-
+    
     nyc_pull_dataset(
       dataset = "erm2-nwe9",
       date_field = "created_date",
@@ -105,9 +104,9 @@ retrieve_311_chunk <- function(
       limit = row_limit,
       timeout_sec = timeout_sec
     ),
-
+    
     error = function(e) {
-
+      
       message(
         paste0(
           "Chunk failed for ",
@@ -118,38 +117,33 @@ retrieve_311_chunk <- function(
           conditionMessage(e)
         )
       )
-
+      
       NULL
     }
   )
-
-
-  # Return NULL when the API request itself fails.
+  
+  
   if (is.null(chunk_data)) {
-
+    
     return(
       NULL
     )
   }
-
-
+  
+  
   # ----------------------------------------
   # Split Oversized Chunk
   # ----------------------------------------
-
-  # If the API returned the full row limit, assume the
-  # requested range may have been truncated.
+  
   if (nrow(chunk_data) >= row_limit) {
-
+    
     number_of_days <- as.integer(
       chunk_end - chunk_start
     )
-
-
-    # A single day should not normally exceed the limit.
-    # Stop rather than silently accepting incomplete data.
+    
+    
     if (number_of_days <= 1) {
-
+      
       stop(
         paste0(
           "A single-day NYC 311 request for ",
@@ -163,8 +157,8 @@ retrieve_311_chunk <- function(
         )
       )
     }
-
-
+    
+    
     message(
       paste0(
         "Chunk ",
@@ -179,14 +173,13 @@ retrieve_311_chunk <- function(
         "-row limit. Splitting into smaller ranges..."
       )
     )
-
-
-    # Split the date range approximately in half.
+    
+    
     split_date <- chunk_start + floor(
       number_of_days / 2
     )
-
-
+    
+    
     first_half <- retrieve_311_chunk(
       chunk_start = chunk_start,
       chunk_end = split_date,
@@ -194,18 +187,16 @@ retrieve_311_chunk <- function(
       row_limit = row_limit,
       timeout_sec = timeout_sec
     )
-
-
-    # Stop this chunk if the first half could not
-    # be retrieved successfully.
+    
+    
     if (is.null(first_half)) {
-
+      
       return(
         NULL
       )
     }
-
-
+    
+    
     second_half <- retrieve_311_chunk(
       chunk_start = split_date,
       chunk_end = chunk_end,
@@ -213,33 +204,28 @@ retrieve_311_chunk <- function(
       row_limit = row_limit,
       timeout_sec = timeout_sec
     )
-
-
-    # Stop this chunk if the second half could not
-    # be retrieved successfully.
+    
+    
     if (is.null(second_half)) {
-
+      
       return(
         NULL
       )
     }
-
-
-    # Combine the complete smaller ranges.
+    
+    
     chunk_data <- bind_rows(
       first_half,
       second_half
     )
-
-
-    # Save the reconstructed complete date range so
-    # future runs can load it directly.
+    
+    
     saveRDS(
       chunk_data,
       chunk_file
     )
-
-
+    
+    
     message(
       paste0(
         "Saved complete split chunk with ",
@@ -250,29 +236,29 @@ retrieve_311_chunk <- function(
         " requests."
       )
     )
-
-
+    
+    
     return(
       chunk_data
     )
   }
-
-
+  
+  
   # ----------------------------------------
   # Save Normal Chunk
   # ----------------------------------------
-
+  
   chunk_data <- standardize_311_columns(
     chunk_data
   )
-
-
+  
+  
   saveRDS(
     chunk_data,
     chunk_file
   )
-
-
+  
+  
   message(
     paste0(
       "Saved chunk with ",
@@ -283,8 +269,8 @@ retrieve_311_chunk <- function(
       " requests."
     )
   )
-
-
+  
+  
   return(
     chunk_data
   )
@@ -292,249 +278,283 @@ retrieve_311_chunk <- function(
 
 
 # ----------------------------------------
-# NYC 311 Data
+# Load NYC 311 Data
 # ----------------------------------------
 
+# Load the existing complete dashboard cache.
+# App startup does not trigger a live API refresh.
 get_311_data <- function(
+    cache_file = "data/311_cache.rds"
+) {
+  
+  if (!file.exists(cache_file)) {
+    
+    stop(
+      paste(
+        "The NYC 311 cache does not exist.",
+        "Run refresh_311_data() first to create it."
+      )
+    )
+  }
+  
+  
+  message(
+    "Loading NYC 311 data from local cache..."
+  )
+  
+  
+  readRDS(
+    cache_file
+  )
+}
+
+
+# ----------------------------------------
+# Refresh NYC 311 Data
+# ----------------------------------------
+
+# Update the existing NYC 311 cache with only the
+# newer records that are not already present.
+#
+# This function is intended to be run separately
+# from normal Shiny app startup, such as once per day.
+refresh_311_data <- function(
     cache_file = "data/311_cache.rds",
     chunk_cache_dir = "data/311_chunks",
-    cache_hours = 24,
-    days_back = 365,
-    chunk_days = 7
+    days_back = 365
 ) {
-
-  cache_is_recent <- FALSE
-
-
-  # ----------------------------------------
-  # Check Final Cache
-  # ----------------------------------------
-
-  # Check whether a recent complete year-long cache
-  # is already available.
-  if (file.exists(cache_file)) {
-
-    cache_age <- difftime(
-      Sys.time(),
-      file.info(cache_file)$mtime,
-      units = "hours"
-    )
-
-    cache_is_recent <- as.numeric(cache_age) < cache_hours
-  }
-
-
-  # Use the complete cached dataset when it is recent.
-  if (cache_is_recent) {
-
-    message(
-      "Loading NYC 311 data from local cache..."
-    )
-
-    return(
-      readRDS(cache_file)
+  
+  if (!file.exists(cache_file)) {
+    
+    stop(
+      paste(
+        "No complete NYC 311 cache was found.",
+        "Create the initial cache before running",
+        "the incremental refresh."
+      )
     )
   }
-
-
-  # ----------------------------------------
-  # Set Date Range
-  # ----------------------------------------
-
+  
+  
   message(
-    "Preparing one year of NYC 311 data..."
+    "Loading existing NYC 311 cache..."
   )
-
-
-  # Use the most recent complete day.
-  # The NYC Open Data "to" date is an exclusive bound,
-  # so this setup includes data through two days ago.
-  end_date <- Sys.Date() - 1
-  start_date <- end_date - days_back
-
-
-  chunk_starts <- seq(
-    from = start_date,
-    to = end_date - 1,
-    by = chunk_days
+  
+  
+  existing_data <- readRDS(
+    cache_file
+  ) %>%
+    standardize_311_columns()
+  
+  
+  existing_dates <- as.Date(
+    existing_data$created_date
   )
-
-
-  # Create the directory used to store individual chunks.
-  dir.create(
-    chunk_cache_dir,
-    showWarnings = FALSE,
-    recursive = TRUE
-  )
-
-
-  # ----------------------------------------
-  # Retrieve Weekly Chunks
-  # ----------------------------------------
-
-  data_chunks <- vector(
-    mode = "list",
-    length = length(chunk_starts)
-  )
-
-
-  retrieval_failed <- FALSE
-
-
-  for (i in seq_along(chunk_starts)) {
-
-    chunk_start <- chunk_starts[i]
-
-
-    # The "to" date is an exclusive upper bound.
-    chunk_end <- min(
-      chunk_start + chunk_days,
-      end_date
+  
+  
+  if (all(is.na(existing_dates))) {
+    
+    stop(
+      "The existing NYC 311 cache contains no valid dates."
     )
-
-
-    chunk_data <- retrieve_311_chunk(
-      chunk_start = chunk_start,
-      chunk_end = chunk_end,
+  }
+  
+  
+  latest_cached_date <- max(
+    existing_dates,
+    na.rm = TRUE
+  )
+  
+  
+  # Use the most recent complete day.
+  # The API "to" date is exclusive.
+  latest_complete_date <- Sys.Date() - 2
+  
+  
+  message(
+    paste0(
+      "Latest cached date: ",
+      latest_cached_date
+    )
+  )
+  
+  
+  message(
+    paste0(
+      "Latest complete date available for refresh: ",
+      latest_complete_date
+    )
+  )
+  
+  
+  # ----------------------------------------
+  # Retrieve Missing Days
+  # ----------------------------------------
+  
+  new_data <- NULL
+  
+  
+  if (latest_cached_date < latest_complete_date) {
+    
+    refresh_start <- latest_cached_date + 1
+    
+    refresh_end <- latest_complete_date + 1
+    
+    
+    dir.create(
+      chunk_cache_dir,
+      showWarnings = FALSE,
+      recursive = TRUE
+    )
+    
+    
+    message(
+      paste0(
+        "Retrieving new NYC 311 data from ",
+        refresh_start,
+        " through ",
+        latest_complete_date,
+        "..."
+      )
+    )
+    
+    
+    new_data <- retrieve_311_chunk(
+      chunk_start = refresh_start,
+      chunk_end = refresh_end,
       chunk_cache_dir = chunk_cache_dir,
       row_limit = 100000,
       timeout_sec = 180
     )
-
-
-    # Stop the current yearly refresh if a chunk
-    # could not be retrieved.
-    if (is.null(chunk_data)) {
-
-      retrieval_failed <- TRUE
-
-      break
-    }
-
-
-    data_chunks[[i]] <- chunk_data
-  }
-
-
-  # ----------------------------------------
-  # Handle Failed Retrieval
-  # ----------------------------------------
-
-  if (retrieval_failed) {
-
-    message(
-      paste(
-        "The yearly NYC 311 refresh was not completed.",
-        "Successfully retrieved chunks were saved",
-        "and will be reused on the next attempt."
-      )
-    )
-
-
-    # If an older complete cache exists, use it.
-    if (file.exists(cache_file)) {
-
-      message(
+    
+    
+    if (is.null(new_data)) {
+      
+      stop(
         paste(
-          "Using the existing complete NYC 311 cache",
-          "for the dashboard."
+          "The NYC 311 incremental refresh failed.",
+          "The existing complete cache was left unchanged."
         )
       )
-
-      return(
-        readRDS(cache_file)
-      )
     }
-
-
-    stop(
-      paste(
-        "Unable to complete the yearly NYC 311 data refresh.",
-        "Run get_311_data() again to continue from the",
-        "last successfully saved chunk."
-      )
+  } else {
+    
+    message(
+      "The NYC 311 cache is already up to date."
+    )
+    
+    return(
+      invisible(existing_data)
     )
   }
-
-
+  
+  
   # ----------------------------------------
-  # Combine All Chunks
+  # Combine Existing and New Data
   # ----------------------------------------
-
-  message(
-    "Combining NYC 311 data..."
-  )
-
-
-  fresh_data <- bind_rows(
-    data_chunks
-  )
-
-
+  
+  if (!is.null(new_data)) {
+    
+    updated_data <- bind_rows(
+      existing_data,
+      new_data
+    )
+    
+  } else {
+    
+    updated_data <- existing_data
+  }
+  
+  
   # ----------------------------------------
-  # Validate Final Dataset
+  # Remove Duplicate Records
   # ----------------------------------------
-
-  if (nrow(fresh_data) == 0) {
-
+  
+  updated_data <- updated_data %>%
+    distinct()
+  
+  
+  # ----------------------------------------
+  # Keep Rolling One-Year Window
+  # ----------------------------------------
+  
+  final_end_date <- latest_complete_date
+  
+  # Include exactly `days_back` calendar days, counting the
+  # final complete date as one of those days.
+  final_start_date <- final_end_date - (days_back - 1)
+  
+  
+  updated_data <- updated_data %>%
+    mutate(
+      request_date_temp = as.Date(created_date)
+    ) %>%
+    filter(
+      request_date_temp >= final_start_date,
+      request_date_temp <= final_end_date
+    ) %>%
+    select(
+      -request_date_temp
+    )
+  
+  
+  # ----------------------------------------
+  # Validate Updated Dataset
+  # ----------------------------------------
+  
+  if (nrow(updated_data) == 0) {
+    
     stop(
-      "The combined NYC 311 dataset contains no records."
+      "The refreshed NYC 311 dataset contains no records."
     )
   }
-
-
-  retrieved_dates <- as.Date(
-    fresh_data$created_date
+  
+  
+  updated_dates <- as.Date(
+    updated_data$created_date
   )
-
-
+  
+  
   message(
     paste0(
-      "Combined date range: ",
+      "Updated date range: ",
       min(
-        retrieved_dates,
+        updated_dates,
         na.rm = TRUE
       ),
       " through ",
       max(
-        retrieved_dates,
+        updated_dates,
         na.rm = TRUE
       )
     )
   )
-
-
+  
+  
   # ----------------------------------------
-  # Save Complete Cache
+  # Save Updated Cache
   # ----------------------------------------
-
-  dir.create(
-    dirname(cache_file),
-    showWarnings = FALSE,
-    recursive = TRUE
-  )
-
-
+  
   saveRDS(
-    fresh_data,
+    updated_data,
     cache_file
   )
-
-
+  
+  
   message(
     paste0(
-      "One year of NYC 311 data saved to cache (",
+      "NYC 311 cache updated successfully (",
       format(
-        nrow(fresh_data),
+        nrow(updated_data),
         big.mark = ","
       ),
       " requests)."
     )
   )
-
-
-  return(
-    fresh_data
+  
+  
+  invisible(
+    updated_data
   )
 }
 
@@ -544,7 +564,7 @@ get_311_data <- function(
 # ----------------------------------------
 
 clean_311_data <- function(data) {
-
+  
   data %>%
     mutate(
       request_date = as.Date(created_date)
@@ -562,79 +582,71 @@ clean_311_data <- function(data) {
 get_borough_boundaries <- function(
     cache_file = "data/borough_boundaries.rds"
 ) {
-
-  # Use the locally cached borough boundaries when available.
-  # These geographic boundaries do not need to be downloaded
-  # every time a dashboard filter changes.
+  
   if (file.exists(cache_file)) {
-
+    
     return(
       readRDS(cache_file)
     )
   }
-
-
+  
+  
   message(
     "Retrieving NYC borough boundaries..."
   )
-
-
+  
+  
   boundary_url <- paste0(
     "https://data.cityofnewyork.us/",
     "resource/gthc-hcne.geojson"
   )
-
-
-  # Retrieve the official NYC borough boundary geometry.
+  
+  
   boundaries <- tryCatch(
-
+    
     sf::st_read(
       boundary_url,
       quiet = TRUE
     ),
-
+    
     error = function(e) {
-
+      
       message(
         "NYC borough boundary request failed: ",
         conditionMessage(e)
       )
-
+      
       NULL
     }
   )
-
-
-  # Save successfully retrieved boundaries locally
-  # so future map updates do not require another request.
+  
+  
   if (!is.null(boundaries)) {
-
+    
     dir.create(
       dirname(cache_file),
       showWarnings = FALSE,
       recursive = TRUE
     )
-
-
+    
+    
     saveRDS(
       boundaries,
       cache_file
     )
-
-
+    
+    
     message(
       "NYC borough boundaries saved to cache."
     )
-
-
+    
+    
     return(
       boundaries
     )
   }
-
-
-  # Stop if neither live nor cached boundary data
-  # is available.
+  
+  
   stop(
     paste(
       "Unable to retrieve NYC borough boundaries",

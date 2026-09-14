@@ -2,7 +2,7 @@
 
 An interactive R Shiny dashboard for exploring NYC 311 service request data from NYC Open Data.
 
-The dashboard allows users to explore approximately one year of 311 service requests by borough, ZIP code, complaint type, agency, and date range. Interactive visualizations and summary metrics update automatically based on the selected filters.
+The dashboard allows users to explore approximately one year of 311 service requests by borough, ZIP code, complaint type, agency, and date range. Interactive visualizations, summary metrics, and an auditory representation of request trends respond to the selected filters.
 
 ## Features
 
@@ -17,23 +17,29 @@ The dashboard includes:
 - Most common complaint type
 - Agency receiving the most requests
 - Interactive time-series visualization of requests over time
+- Data sonification of the filtered daily request trend
 - Interactive map of NYC 311 requests with points color-coded by borough
+- Map popups showing borough, ZIP code, complaint type, and responsible agency
 - Top 10 agency chart
 - Top 10 complaint type chart
 - Interactive Plotly tooltips
 - Graceful handling of filter combinations with no matching records
-- Local data caching to improve reliability and reduce repeated API requests
+- Local data caching to improve startup reliability and reduce repeated API requests
+- Separate incremental data-refresh workflow for updating the cache
 
 ## Built With
 
 - R
 - Shiny
 - shinydashboard
+- shinythemes
 - tidyverse
 - ggplot2
 - Plotly
 - Leaflet
 - nycOpenData
+- sonify
+- tuneR
 
 ## Data Source
 
@@ -45,11 +51,9 @@ Dataset ID:
 
 Data are retrieved using the `nycOpenData` R package.
 
-The application retrieves approximately one year of NYC 311 service requests for interactive exploration. Because a full year contains millions of records, data are retrieved in smaller date-based chunks and combined into a complete dataset.
+The dashboard is designed around a rolling one-year window of NYC 311 service requests. Because a full year contains millions of records, the data-retrieval workflow supports smaller date-based chunks and automatically divides an individual request into smaller ranges if it reaches the 100,000-row retrieval limit.
 
-If an individual API request reaches the 100,000-row retrieval limit, the application automatically divides that date range into smaller requests to avoid silently truncating the data.
-
-The most recent potentially incomplete day is excluded from the retrieval window so that the dashboard does not display a partially reported day as though it were complete.
+To reduce the risk of displaying a partially reported day as though it were complete, the refresh workflow uses a conservative cutoff and updates through two calendar days before the refresh date.
 
 ## Installation
 
@@ -77,11 +81,25 @@ install.packages(c(
   "tidyverse",
   "plotly",
   "leaflet",
-  "nycOpenData"
+  "nycOpenData",
+  "sonify",
+  "tuneR"
 ))
 ```
 
-### 3. Run the Dashboard
+### 3. Prepare the Data Cache
+
+The Shiny application loads its NYC 311 data from:
+
+```text
+data/311_cache.rds
+```
+
+Normal app startup does not retrieve a full year of data from the API. A valid cache must therefore be available before the dashboard is launched.
+
+The `refresh_311_data()` function in `R/data.R` is used separately from normal Shiny startup to incrementally update an existing cache with newly available complete days.
+
+### 4. Run the Dashboard
 
 Open `app.R` in RStudio and click **Run App**.
 
@@ -93,15 +111,17 @@ shiny::runApp()
 
 The dashboard will open in the RStudio Viewer or your web browser.
 
-## Data Caching
+## Data Caching and Refreshing
 
-To reduce repeated API requests and provide a fallback when NYC Open Data is temporarily unavailable, the application uses local caching for NYC 311 data.
+To improve startup reliability and avoid downloading millions of records whenever the application launches, the dashboard separates **data loading** from **data refreshing**.
 
-The complete combined dataset is stored locally at:
+When the application starts, `get_311_data()` loads the existing complete cache from:
 
 ```text
 data/311_cache.rds
 ```
+
+The application does not perform a live NYC Open Data refresh during normal startup.
 
 Individual successfully retrieved date chunks are stored in:
 
@@ -109,24 +129,29 @@ Individual successfully retrieved date chunks are stored in:
 data/311_chunks/
 ```
 
-Both the complete cache and individual chunk files are excluded from Git using `.gitignore` and are not included in the repository.
+The complete cache and chunk files are intended to remain outside version control.
 
-When the application starts, it checks whether a recent complete cached dataset is available. If the cache is less than 24 hours old, the cached data are used.
+Data updates are handled separately with `refresh_311_data()`. The refresh process:
 
-If a recent complete cache is not available, the application retrieves the approximately one-year dataset in smaller date-based chunks. Successfully retrieved chunks are saved individually so they can be reused if an API request fails before the full refresh is completed.
+1. Loads the existing complete cache.
+2. Identifies the latest date already stored.
+3. Uses two calendar days before the current date as the latest complete date available for refresh.
+4. Retrieves only missing dates rather than downloading the entire year again.
+5. Automatically divides a request into smaller date ranges if it reaches the 100,000-row retrieval limit.
+6. Combines the new records with the existing cache and removes duplicate rows.
+7. Trims the result to a rolling 365-day window.
+8. Saves the updated complete cache.
 
-If a requested chunk reaches the 100,000-row API limit, the application automatically divides that date range into smaller requests and combines the results.
+The refresh function is designed to be run separately from the Shiny application, such as through a scheduled daily process in the eventual deployment environment. The scheduling mechanism depends on the platform used to deploy the dashboard and is not performed automatically by `app.R`.
 
-After all required chunks are successfully retrieved, they are combined and saved as the complete local cache.
-
-If the yearly refresh cannot be completed but an older complete cache is available, the application uses that dataset as a fallback. If neither a complete refresh nor an existing complete cache is available, the application stops and displays an error message.
+If an incremental API request fails, the existing complete cache is left unchanged.
 
 ## Dashboard Filters
 
 Users can filter service requests using:
 
 - **Borough** — Explore requests within a selected NYC borough.
-- **ZIP Code** — Search for requests within a specific ZIP code.
+- **ZIP Code** — Search for or select requests within a specific ZIP code.
 - **Complaint Type** — Filter requests by the type of reported issue.
 - **Agency** — Filter requests based on the NYC agency associated with the request.
 - **Date Range** — Limit results to a selected period.
@@ -149,9 +174,11 @@ These summaries update automatically when filters are changed.
 
 Displays the number of service requests submitted each day within the selected filters.
 
+The **Play Sonification** feature provides an auditory representation of this same filtered daily request trend. The sonification uses the currently selected borough, ZIP code, complaint type, agency, and date range, allowing the time-series pattern to be explored through sound as an additional, accessibility-oriented representation of the data.
+
 ### NYC 311 Request Map
 
-Displays the geographic locations of NYC 311 service requests using an interactive grayscale street map. Request locations are color-coded by borough, and users can zoom, pan, and select individual points to view the borough, complaint type, and responsible agency.
+Displays the geographic locations of NYC 311 service requests using an interactive grayscale street map. Request locations are color-coded by borough, and users can zoom, pan, and select individual points to view the borough, ZIP code, complaint type, and responsible agency.
 
 To maintain dashboard responsiveness when a large number of requests match the selected filters, the map displays a reproducible sample of up to 10,000 request locations. Summary metrics, filters, and other visualizations continue to use the complete filtered dataset.
 
@@ -185,15 +212,15 @@ nyc-311-dashboard/
 
 ### `app.R`
 
-Defines the Shiny user interface, server logic, reactive filtering, summary value boxes, interactive Plotly charts, and Leaflet map.
+Defines the Shiny user interface, server logic, reactive filtering, summary value boxes, interactive Plotly charts, Leaflet map, and filtered data-sonification controls.
 
 ### `R/data.R`
 
-Contains functions for retrieving, caching, validating, and cleaning NYC 311 service request data. Large API requests are divided into smaller date ranges when necessary to avoid incomplete retrievals.
+Contains functions for loading, incrementally refreshing, caching, validating, and cleaning NYC 311 service request data. Large API requests are divided into smaller date ranges when necessary to avoid incomplete retrievals.
 
 ### `R/helpers.R`
 
-Contains reusable helper functions used to generate choices for the dashboard filters.
+Contains reusable helper functions used to generate choices for the dashboard filters, including the searchable ZIP code selector.
 
 ### `R/plots.R`
 
@@ -201,7 +228,7 @@ Contains reusable functions for creating the dashboard visualizations and intera
 
 ### `data/`
 
-Stores the complete local NYC 311 cache and individual date-chunk caches used by the data retrieval workflow. These cached files are excluded from version control.
+Stores the complete local NYC 311 cache and individual date-chunk caches used by the data-retrieval workflow. These cached files are excluded from version control.
 
 ### `www/custom.css`
 
@@ -213,20 +240,19 @@ The dashboard is designed to handle filter combinations that return no matching 
 
 When no records match the selected filters, the dashboard summary displays zero requests and "No Data" where appropriate. The visualizations also provide no-data handling for empty filter results.
 
-The data-loading workflow saves successfully retrieved date chunks as they are downloaded. If an API request fails during a yearly refresh, completed chunks remain available for reuse during a later attempt.
-
-If the refresh cannot be completed but an older complete cache is available, the dashboard uses the existing cached dataset as a fallback.
+The data-refresh workflow preserves the existing complete cache if a required incremental API request fails. Successfully retrieved date chunks can be cached for reuse by the retrieval workflow.
 
 ## Usage
 
 After launching the dashboard:
 
 1. Select a borough or leave the filter set to **All**.
-2. Optionally select a ZIP code.
+2. Optionally search for or select a ZIP code.
 3. Select a complaint type or leave it set to **All**.
 4. Select an agency or leave it set to **All**.
 5. Adjust the date range if desired.
 6. Explore the updated summary metrics and interactive visualizations.
+7. Select **Play Sonification** to hear an auditory representation of the currently filtered request trend.
 
 Multiple filters can be applied at the same time.
 
@@ -237,10 +263,11 @@ Potential future extensions of the dashboard include:
 - Additional geographic analysis and map features
 - User-selectable historical periods beyond the current one-year window
 - Additional interactive visualizations
-- Alternative ways of representing NYC 311 data, including data sonification
+- Further accessibility enhancements and refinement of the sonification experience
+- Deployment-specific automation of the incremental data-refresh schedule
 
 ## Repository Status
 
 This dashboard was developed as part of the NYC Open Data Lab internship program.
 
-The application has been tested for dashboard filtering, interactive visualization, empty-result handling, full-year data retrieval, and data-loading behavior and is ready for public release and future extension.
+The application has been tested for dashboard filtering, searchable ZIP code selection, interactive visualization, map popups, empty-result handling, full-year cached data loading, incremental refresh behavior, and filtered data sonification. The current version is being prepared for public deployment.

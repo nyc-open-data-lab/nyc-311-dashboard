@@ -341,6 +341,7 @@ create_311_map <- function(data) {
       fillOpacity = 0.8,
       popup = ~paste0(
         "<strong>Borough:</strong> ", borough,
+        "<br><strong>ZIP Code:</strong> ", incident_zip,
         "<br><strong>Complaint:</strong> ", complaint_type,
         "<br><strong>Agency:</strong> ", agency_name
       )
