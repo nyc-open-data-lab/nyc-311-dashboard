@@ -46,7 +46,7 @@ retrieve_311_chunk <- function(
       chunk_start,
       "_",
       chunk_end - 1,
-      ".rds"
+      ".parquet"
     )
   )
   
@@ -67,7 +67,7 @@ retrieve_311_chunk <- function(
       )
     )
     
-    cached_data <- readRDS(
+    cached_data <- arrow::read_parquet(
       chunk_file
     )
     
@@ -220,9 +220,10 @@ retrieve_311_chunk <- function(
     )
     
     
-    saveRDS(
+    arrow::write_parquet(
       chunk_data,
-      chunk_file
+      chunk_file,
+      compression = "gzip"
     )
     
     
@@ -253,9 +254,10 @@ retrieve_311_chunk <- function(
   )
   
   
-  saveRDS(
+  arrow::write_parquet(
     chunk_data,
-    chunk_file
+    chunk_file,
+    compression = "gzip"
   )
   
   
@@ -281,10 +283,10 @@ retrieve_311_chunk <- function(
 # Load NYC 311 Data
 # ----------------------------------------
 
-# Load the existing complete dashboard cache.
+# Load the existing complete 2026-to-date dashboard cache.
 # App startup does not trigger a live API refresh.
 get_311_data <- function(
-    cache_file = "data/311_cache.rds"
+    cache_file = "data/311_cache.parquet"
 ) {
   
   if (!file.exists(cache_file)) {
@@ -303,7 +305,7 @@ get_311_data <- function(
   )
   
   
-  readRDS(
+  arrow::read_parquet(
     cache_file
   )
 }
@@ -313,15 +315,15 @@ get_311_data <- function(
 # Refresh NYC 311 Data
 # ----------------------------------------
 
-# Update the existing NYC 311 cache with only the
+# Update the existing 2026-to-date NYC 311 cache with only the
 # newer records that are not already present.
 #
 # This function is intended to be run separately
 # from normal Shiny app startup, such as once per day.
 refresh_311_data <- function(
-    cache_file = "data/311_cache.rds",
+    cache_file = "data/311_cache.parquet",
     chunk_cache_dir = "data/311_chunks",
-    days_back = 365
+    start_date = as.Date("2026-01-01")
 ) {
   
   if (!file.exists(cache_file)) {
@@ -341,7 +343,7 @@ refresh_311_data <- function(
   )
   
   
-  existing_data <- readRDS(
+  existing_data <- arrow::read_parquet(
     cache_file
   ) %>%
     standardize_311_columns()
@@ -475,22 +477,17 @@ refresh_311_data <- function(
   
   
   # ----------------------------------------
-  # Keep Rolling One-Year Window
+  # Keep 2026-to-Date Window
   # ----------------------------------------
   
   final_end_date <- latest_complete_date
-  
-  # Include exactly `days_back` calendar days, counting the
-  # final complete date as one of those days.
-  final_start_date <- final_end_date - (days_back - 1)
-  
   
   updated_data <- updated_data %>%
     mutate(
       request_date_temp = as.Date(created_date)
     ) %>%
     filter(
-      request_date_temp >= final_start_date,
+      request_date_temp >= start_date,
       request_date_temp <= final_end_date
     ) %>%
     select(
@@ -535,9 +532,10 @@ refresh_311_data <- function(
   # Save Updated Cache
   # ----------------------------------------
   
-  saveRDS(
+  arrow::write_parquet(
     updated_data,
-    cache_file
+    cache_file,
+    compression = "gzip"
   )
   
   

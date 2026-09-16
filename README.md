@@ -2,7 +2,7 @@
 
 An interactive R Shiny dashboard for exploring NYC 311 service request data from NYC Open Data.
 
-The dashboard allows users to explore approximately one year of 311 service requests by borough, ZIP code, complaint type, agency, and date range. Interactive visualizations, summary metrics, and an auditory representation of request trends respond to the selected filters.
+The dashboard allows users to explore NYC 311 service requests from January 1, 2026 through the most recent complete date available to the dashboard by borough, ZIP code, complaint type, agency, and date range. Interactive visualizations, summary metrics, and an auditory representation of request trends respond to the selected filters.
 
 ## Features
 
@@ -24,7 +24,7 @@ The dashboard includes:
 - Top 10 complaint type chart
 - Interactive Plotly tooltips
 - Graceful handling of filter combinations with no matching records
-- Local data caching to improve startup reliability and reduce repeated API requests
+- Local gzip-compressed Parquet caching to improve startup reliability and reduce repeated API requests
 - Separate incremental data-refresh workflow for updating the cache
 
 ## Built With
@@ -38,6 +38,7 @@ The dashboard includes:
 - Plotly
 - Leaflet
 - nycOpenData
+- arrow
 - sonify
 - tuneR
 
@@ -51,7 +52,7 @@ Dataset ID:
 
 Data are retrieved using the `nycOpenData` R package.
 
-The dashboard is designed around a rolling one-year window of NYC 311 service requests. Because a full year contains millions of records, the data-retrieval workflow supports smaller date-based chunks and automatically divides an individual request into smaller ranges if it reaches the 100,000-row retrieval limit.
+The dashboard is designed around NYC 311 service requests beginning January 1, 2026 and extending through the most recent complete date available to the dashboard. Because this period contains millions of records, the data-retrieval workflow supports smaller date-based chunks and automatically divides an individual request into smaller ranges if it reaches the 100,000-row retrieval limit.
 
 To reduce the risk of displaying a partially reported day as though it were complete, the refresh workflow uses a conservative cutoff and updates through two calendar days before the refresh date.
 
@@ -82,6 +83,7 @@ install.packages(c(
   "plotly",
   "leaflet",
   "nycOpenData",
+  "arrow",
   "sonify",
   "tuneR"
 ))
@@ -92,10 +94,10 @@ install.packages(c(
 The Shiny application loads its NYC 311 data from:
 
 ```text
-data/311_cache.rds
+data/311_cache.parquet
 ```
 
-Normal app startup does not retrieve a full year of data from the API. A valid cache must therefore be available before the dashboard is launched.
+Normal app startup does not retrieve the complete 2026-to-date dataset from the API. A valid cache must therefore be available before the dashboard is launched.
 
 The `refresh_311_data()` function in `R/data.R` is used separately from normal Shiny startup to incrementally update an existing cache with newly available complete days.
 
@@ -118,12 +120,12 @@ To improve startup reliability and avoid downloading millions of records wheneve
 When the application starts, `get_311_data()` loads the existing complete cache from:
 
 ```text
-data/311_cache.rds
+data/311_cache.parquet
 ```
 
 The application does not perform a live NYC Open Data refresh during normal startup.
 
-Individual successfully retrieved date chunks are stored in:
+Individual successfully retrieved date chunks are stored as gzip-compressed Parquet files in:
 
 ```text
 data/311_chunks/
@@ -136,11 +138,11 @@ Data updates are handled separately with `refresh_311_data()`. The refresh proce
 1. Loads the existing complete cache.
 2. Identifies the latest date already stored.
 3. Uses two calendar days before the current date as the latest complete date available for refresh.
-4. Retrieves only missing dates rather than downloading the entire year again.
+4. Retrieves only missing dates rather than downloading the complete 2026-to-date dataset again.
 5. Automatically divides a request into smaller date ranges if it reaches the 100,000-row retrieval limit.
 6. Combines the new records with the existing cache and removes duplicate rows.
-7. Trims the result to a rolling 365-day window.
-8. Saves the updated complete cache.
+7. Keeps records from January 1, 2026 through the latest complete date.
+8. Saves the updated complete cache as a gzip-compressed Parquet file.
 
 The refresh function is designed to be run separately from the Shiny application, such as through a scheduled daily process in the eventual deployment environment. The scheduling mechanism depends on the platform used to deploy the dashboard and is not performed automatically by `app.R`.
 
@@ -228,7 +230,7 @@ Contains reusable functions for creating the dashboard visualizations and intera
 
 ### `data/`
 
-Stores the complete local NYC 311 cache and individual date-chunk caches used by the data-retrieval workflow. These cached files are excluded from version control.
+Stores the complete local NYC 311 Parquet cache and individual Parquet date-chunk caches used by the data-retrieval workflow. These cached files are excluded from version control.
 
 ### `www/custom.css`
 
@@ -261,7 +263,7 @@ Multiple filters can be applied at the same time.
 Potential future extensions of the dashboard include:
 
 - Additional geographic analysis and map features
-- User-selectable historical periods beyond the current one-year window
+- User-selectable historical periods before January 1, 2026
 - Additional interactive visualizations
 - Further accessibility enhancements and refinement of the sonification experience
 - Deployment-specific automation of the incremental data-refresh schedule
@@ -270,4 +272,4 @@ Potential future extensions of the dashboard include:
 
 This dashboard was developed as part of the NYC Open Data Lab internship program.
 
-The application has been tested for dashboard filtering, searchable ZIP code selection, interactive visualization, map popups, empty-result handling, full-year cached data loading, incremental refresh behavior, and filtered data sonification. The current version is being prepared for public deployment.
+The application has been tested for dashboard filtering, searchable ZIP code selection, interactive visualization, map popups, empty-result handling, 2026-to-date Parquet cached data loading, incremental refresh behavior, and filtered data sonification. The current version is being prepared for public deployment.

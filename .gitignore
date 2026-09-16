@@ -6,6 +6,7 @@
 # NYC 311 cached data
 data/311_cache.rds
 data/311_cache_backup.rds
+data/311_cache.parquet
 data/311_chunks/
 data/borough_boundaries.rds
 
