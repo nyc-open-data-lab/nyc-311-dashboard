@@ -1,6 +1,5 @@
-#
 # NYC 311 Shiny Dashboard
-#
+
 
 # -------------------------
 # Packages
@@ -40,7 +39,7 @@ source("R/helpers.R")
 # Load and Prepare Data
 # -------------------------
 
-# Load one year of NYC 311 data from the local cache.
+# Load 2026-to-date NYC 311 data from the local cache.
 data_nyc <- get_311_data()
 
 # Clean the data and create a reusable request-date column.
@@ -109,13 +108,15 @@ ui <- dashboardPage(
     ),
     
     # Filter requests by creation date.
+    # Default to the latest 7 days available in the dataset,
+    # while allowing users to select the full available range.
     dateRangeInput(
       "date_range",
       "Select Date Range",
-      start = min(
+      start = max(
         data_nyc$request_date,
         na.rm = TRUE
-      ),
+      ) - 6,
       end = max(
         data_nyc$request_date,
         na.rm = TRUE
@@ -264,7 +265,7 @@ server <- function(input, output, session) {
   # Reactive Data Filtering
   # -------------------------
   
-  # Start with the full year-long dataset and apply each
+  # Start with the full dataset and apply each
   # selected dashboard filter in sequence.
   filtered_data <- reactive({
     
@@ -422,8 +423,9 @@ server <- function(input, output, session) {
     }
     
     
-    # Generate a 90-second sonification using the same
-    # daily request counts represented by the time-series chart.
+    # Generate a sonification using the same daily request
+    # counts represented by the time-series chart.
+    # The duration matches the number of days displayed.
     sonification_audio <- sonify(
       x = seq_len(
         nrow(sonify_data)
@@ -478,6 +480,7 @@ server <- function(input, output, session) {
       style = "width: 100%; margin-top: 10px;"
     )
   })
+  
   
   # -------------------------
   # Summary Value Boxes
