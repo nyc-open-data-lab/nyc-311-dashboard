@@ -14,6 +14,10 @@ library(tidyverse)
 library(plotly)
 library(leaflet)
 
+# Sonification and audio packages
+library(sonify)
+library(tuneR)
+
 # NYC Open Data helper package
 library(nycOpenData)
 
@@ -36,12 +40,10 @@ source("R/helpers.R")
 # Load and Prepare Data
 # -------------------------
 
-# Retrieve recent NYC 311 data.
-# The data function uses a local cache when available
-# to improve startup speed and reduce repeated API requests.
+# Load one year of NYC 311 data from the local cache.
 data_nyc <- get_311_data()
 
-# Remove records that are missing required agency information.
+# Clean the data and create a reusable request-date column.
 data_nyc <- clean_311_data(data_nyc)
 
 
@@ -71,7 +73,7 @@ ui <- dashboardPage(
       )
     ),
     
-    # Filter requests by NYC borough
+    # Filter requests by NYC borough.
     selectInput(
       "borough",
       "Select Borough",
@@ -79,7 +81,7 @@ ui <- dashboardPage(
       selected = "All"
     ),
     
-    # Search and filter requests by ZIP code
+    # Search and filter requests by ZIP code.
     selectizeInput(
       "zip_code",
       "Select ZIP Code",
@@ -90,7 +92,7 @@ ui <- dashboardPage(
       )
     ),
     
-    # Filter requests by complaint category
+    # Filter requests by complaint category.
     selectInput(
       "complaint_type",
       "Select Complaint Type",
@@ -98,7 +100,7 @@ ui <- dashboardPage(
       selected = "All"
     ),
     
-    # Filter requests by responsible NYC agency
+    # Filter requests by responsible NYC agency.
     selectInput(
       "agency",
       "Select Agency",
@@ -106,24 +108,24 @@ ui <- dashboardPage(
       selected = "All"
     ),
     
-    # Filter requests by creation date
+    # Filter requests by creation date.
     dateRangeInput(
       "date_range",
       "Select Date Range",
       start = min(
-        as.Date(data_nyc$created_date),
+        data_nyc$request_date,
         na.rm = TRUE
       ),
       end = max(
-        as.Date(data_nyc$created_date),
+        data_nyc$request_date,
         na.rm = TRUE
       ),
       min = min(
-        as.Date(data_nyc$created_date),
+        data_nyc$request_date,
         na.rm = TRUE
       ),
       max = max(
-        as.Date(data_nyc$created_date),
+        data_nyc$request_date,
         na.rm = TRUE
       )
     )
@@ -136,7 +138,7 @@ ui <- dashboardPage(
   
   dashboardBody(
     
-    # Load custom CSS from the www/ directory
+    # Load custom CSS from the www/ directory.
     tags$head(
       tags$link(
         rel = "stylesheet",
@@ -185,7 +187,22 @@ ui <- dashboardPage(
             width = 6,
             status = "primary",
             solidHeader = TRUE,
-            plotlyOutput("timeSeriesPlot")
+            
+            plotlyOutput(
+              "timeSeriesPlot"
+            ),
+            
+            br(),
+            
+            actionButton(
+              "playSonification",
+              "Play Sonification",
+              icon = icon("play")
+            ),
+            
+            uiOutput(
+              "sonificationPlayer"
+            )
           ),
           
           box(
@@ -193,6 +210,7 @@ ui <- dashboardPage(
             width = 6,
             status = "primary",
             solidHeader = TRUE,
+            
             leafletOutput(
               "requestMap",
               height = 400
@@ -212,7 +230,10 @@ ui <- dashboardPage(
             width = 6,
             status = "primary",
             solidHeader = TRUE,
-            plotlyOutput("distPlot")
+            
+            plotlyOutput(
+              "distPlot"
+            )
           ),
           
           box(
@@ -220,7 +241,10 @@ ui <- dashboardPage(
             width = 6,
             status = "primary",
             solidHeader = TRUE,
-            plotlyOutput("complaintPlot")
+            
+            plotlyOutput(
+              "complaintPlot"
+            )
           )
         )
       )
@@ -233,21 +257,21 @@ ui <- dashboardPage(
 # Server Logic
 # -------------------------
 
-server <- function(input, output) {
+server <- function(input, output, session) {
   
   
   # -------------------------
   # Reactive Data Filtering
   # -------------------------
   
-  # Start with the full dataset and apply each selected
-  # dashboard filter in sequence.
+  # Start with the full year-long dataset and apply each
+  # selected dashboard filter in sequence.
   filtered_data <- reactive({
     
     dat <- data_nyc
     
     
-    # Filter by borough
+    # Filter by borough.
     if (!is.null(input$borough) &&
         input$borough != "All") {
       
@@ -258,7 +282,7 @@ server <- function(input, output) {
     }
     
     
-    # Filter by ZIP code
+    # Filter by ZIP code.
     if (!is.null(input$zip_code) &&
         input$zip_code != "All") {
       
@@ -269,7 +293,7 @@ server <- function(input, output) {
     }
     
     
-    # Filter by complaint type
+    # Filter by complaint type.
     if (!is.null(input$complaint_type) &&
         input$complaint_type != "All") {
       
@@ -280,7 +304,7 @@ server <- function(input, output) {
     }
     
     
-    # Filter by agency
+    # Filter by agency.
     if (!is.null(input$agency) &&
         input$agency != "All") {
       
@@ -291,18 +315,18 @@ server <- function(input, output) {
     }
     
     
-    # Filter by selected date range
+    # Filter by selected date range.
     if (!is.null(input$date_range)) {
       
       dat <- dat %>%
         filter(
-          as.Date(created_date) >= input$date_range[1],
-          as.Date(created_date) <= input$date_range[2]
+          request_date >= input$date_range[1],
+          request_date <= input$date_range[2]
         )
     }
     
     
-    # Return the filtered dataset for downstream outputs
+    # Return the filtered dataset for downstream outputs.
     dat
   })
   
@@ -345,6 +369,115 @@ server <- function(input, output) {
       )
   })
   
+  
+  # -------------------------
+  # Sonification Data
+  # -------------------------
+  
+  # Summarize the currently filtered requests by day so
+  # the sonification matches the time-series visualization.
+  sonification_data <- reactive({
+    
+    filtered_data() %>%
+      filter(
+        !is.na(request_date)
+      ) %>%
+      count(
+        request_date,
+        name = "n"
+      ) %>%
+      arrange(
+        request_date
+      )
+  })
+  
+  
+  # -------------------------
+  # Sonification Generation
+  # -------------------------
+  
+  # Track when a new sonification has been generated.
+  # This also gives each audio source a unique URL so
+  # the browser does not reuse an older cached recording.
+  sonification_version <- reactiveVal(0)
+  
+  
+  # Generate a new sonification only when the user
+  # presses the Play Sonification button.
+  observeEvent(input$playSonification, {
+    
+    sonify_data <- sonification_data()
+    
+    
+    # Require at least two daily observations to create
+    # a meaningful sonification.
+    if (nrow(sonify_data) < 2) {
+      
+      showNotification(
+        "Not enough data to create a sonification for the current filters.",
+        type = "warning"
+      )
+      
+      return()
+    }
+    
+    
+    # Generate a 90-second sonification using the same
+    # daily request counts represented by the time-series chart.
+    sonification_audio <- sonify(
+      x = seq_len(
+        nrow(sonify_data)
+      ),
+      y = sonify_data$n,
+      waveform = "triangle",
+      interpolation = "constant",
+      duration = 90,
+      flim = c(
+        220,
+        440
+      ),
+      pulse_len = 0.03,
+      pulse_amp = 0.1
+    )
+    
+    
+    # Save the generated audio file in the www directory
+    # so it can be served by the Shiny application.
+    writeWave(
+      sonification_audio,
+      filename = "www/sonification.wav"
+    )
+    
+    
+    # Increment the version after the new audio file
+    # has been successfully created.
+    sonification_version(
+      sonification_version() + 1
+    )
+  })
+  
+  
+  # Display an audio player after the first sonification
+  # has been generated. Autoplay allows the sound to begin
+  # after the user presses the Play Sonification button.
+  output$sonificationPlayer <- renderUI({
+    
+    req(
+      sonification_version() > 0
+    )
+    
+    tags$audio(
+      id = "sonificationAudio",
+      controls = NA,
+      autoplay = NA,
+      src = paste0(
+        "sonification.wav?v=",
+        sonification_version()
+      ),
+      type = "audio/wav",
+      style = "width: 100%; margin-top: 10px;"
+    )
+  })
   
   # -------------------------
   # Summary Value Boxes
