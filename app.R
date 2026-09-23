@@ -430,8 +430,8 @@ server <- function(input, output, session) {
       ),
       y = sonify_data$n,
       waveform = "triangle",
-      interpolation = "constant",
-      duration = 90,
+      interpolation = "linear",
+      duration = nrow(sonify_data),
       flim = c(
         220,
         440
