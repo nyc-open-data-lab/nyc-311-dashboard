@@ -176,7 +176,7 @@ create_complaint_plot <- function(data) {
 # Create a line chart showing the number of NYC 311
 # requests submitted on each date.
 create_time_series_plot <- function(data) {
-
+  
   plot_data <- data %>%
     mutate(
       request_date = as.Date(
@@ -190,11 +190,11 @@ create_time_series_plot <- function(data) {
     arrange(
       request_date
     )
-
-
+  
+  
   # Display a message if no records match the selected filters.
   if (nrow(plot_data) == 0) {
-
+    
     return(
       ggplot() +
         annotate(
@@ -209,8 +209,8 @@ create_time_series_plot <- function(data) {
         theme_void()
     )
   }
-
-
+  
+  
   ggplot(
     plot_data,
     aes(

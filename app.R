@@ -249,6 +249,34 @@ ui <- dashboardPage(
           )
         )
       )
+    ),
+    # Dashboard footer
+    tags$footer(
+      class = "dashboard-footer",
+      
+      "Created by ",
+      
+      tags$a(
+        "Emma Tupone",
+        href = "https://www.linkedin.com/in/emma-tupone/",
+        target = "_blank"
+      ),
+      
+      " and ",
+      
+      tags$a(
+        "Christian Martinez",
+        href = "https://www.linkedin.com/in/christian-a-martinez/",
+        target = "_blank"
+      ),
+      
+      " · ",
+      
+      tags$a(
+        "The Open Data Lab",
+        href = "https://nycopendatalab.org",
+        target = "_blank"
+      )
     )
   )
 )
