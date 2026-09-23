@@ -108,3 +108,23 @@
 .leaflet-tile-pane img.leaflet-tile {
   filter: grayscale(100%) saturate(0%) brightness(1.12) contrast(0.85);
 }
+
+/* footer */
+
+.dashboard-footer {
+  text-align: center;
+  padding: 20px;
+  margin-top: 20px;
+  font-size: 14px;
+  color: #666;
+}
+
+.dashboard-footer a {
+  color: #3c8dbc;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.dashboard-footer a:hover {
+  text-decoration: underline;
+}
