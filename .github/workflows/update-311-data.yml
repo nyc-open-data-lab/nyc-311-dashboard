@@ -2,7 +2,7 @@ name: Update NYC 311 Data
 
 on:
   schedule:
-    - cron: "17 6 * * *"
+    - cron: "17 4 * * *"
       timezone: "America/New_York"
 
   # Allows manual testing from the GitHub Actions page
@@ -49,7 +49,6 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
           git add data/311_cache.parquet
-          git add data/311_chunks/
 
           if git diff --cached --quiet; then
             echo "NYC 311 data is already up to date."
