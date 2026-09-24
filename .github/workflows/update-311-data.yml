@@ -1,0 +1,59 @@
+name: Update NYC 311 Data
+
+on:
+  schedule:
+    - cron: "17 6 * * *"
+      timezone: "America/New_York"
+
+  # Allows manual testing from the GitHub Actions page
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update-311-data:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up R
+        uses: r-lib/actions/setup-r@v2
+        with:
+          use-public-rspm: true
+
+      - name: Install required R packages
+        shell: Rscript {0}
+        run: |
+          install.packages(c(
+            "arrow",
+            "dplyr",
+            "nycOpenData"
+          ))
+
+      - name: Refresh NYC 311 data
+        shell: Rscript {0}
+        run: |
+          library(arrow)
+          library(dplyr)
+          library(nycOpenData)
+
+          source("R/data.R")
+          refresh_311_data()
+
+      - name: Commit updated data
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add data/311_cache.parquet
+          git add data/311_chunks/
+
+          if git diff --cached --quiet; then
+            echo "NYC 311 data is already up to date."
+          else
+            git commit -m "Update NYC 311 data"
+            git push
+          fi
