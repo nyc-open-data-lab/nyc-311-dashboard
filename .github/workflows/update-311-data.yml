@@ -63,5 +63,4 @@ jobs:
         env:
           MIRROR_TOKEN: ${{ secrets.MIRROR_TOKEN }}
         run: |
-          git remote add mirror https://x-access-token:${MIRROR_TOKEN}@github.com/martinezc1/nyc-311-dashboard.git
-          git push mirror main --force
+          git push "https://x-access-token:${MIRROR_TOKEN}@github.com/martinezc1/nyc-311-dashboard.git" main:main --force
