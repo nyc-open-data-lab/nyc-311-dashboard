@@ -141,10 +141,26 @@ ui <- dashboardPage(
     
     # Load custom CSS from the www/ directory.
     tags$head(
+      
       tags$link(
         rel = "stylesheet",
         type = "text/css",
         href = "custom.css"
+      ),
+      
+      # Google Analytics
+      tags$script(
+        async = NA,
+        src = "https://www.googletagmanager.com/gtag/js?id=G-V238GJK21R"
+      ),
+      
+      tags$script(
+        HTML("
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-V238GJK21R');
+    ")
       )
     ),
     
