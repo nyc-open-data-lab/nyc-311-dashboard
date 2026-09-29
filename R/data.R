@@ -370,7 +370,7 @@ refresh_311_data <- function(
   
   # Use the most recent complete day.
   # The API "to" date is exclusive.
-  latest_complete_date <- Sys.Date() - 1
+  latest_complete_date <- Sys.Date() - 2
   
   
   message(
